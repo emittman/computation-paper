@@ -1,0 +1,12 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+
+# LaTeX auxiliary files
+*.aux
+*.log
+*.synctex.gz
+
+methods_paper.pdf
