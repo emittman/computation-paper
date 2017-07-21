@@ -111,7 +111,17 @@ p(\tilde{\beta}_k|\cdot) \propto \prod_{g:\zeta_g=k} \op{N}(y_g;\,X\tilde{\beta}
 \implies p(\tilde{\beta}_k|\cdot) = \op{N}(\tilde{\beta}_k; \hat{\beta}_k,\, \hat{\Lambda}_k), \mbox{ where }\hat{\Lambda}_k= \left( \sigma^{-2}_g\sum_{g:\zeta_g=k} X^\top W_g X + \Lambda^{-1} \right)^{-1}, \mbox{ and }\hat{\beta}_k=\hat{\Lambda}_k \sum_{g:\zeta_g=k} X^\top W_g y_g
 \end{equation*}
 
-Simulation from this distribution is accomplished by transforming a standard multivariate normal draw with identity covariance, $Z_k$, and setting $\tilde{\beta}_k = \Lambda^{1\frac{1}{2}} Z_k + \hat{\beta}_k$. Computation of $\hat{\Lambda}_k$ not actually done, rather is the corresponding precision matrix is computed by summing existing summaries  and parameters (\code{for\_each}) and then performing in-place Cholesky decomposition. $\hat{\beta}_k$ is then calculated with solving  $(\hat{\Lambda}_k^{\frac{1}{2}})^2\hat{\beta}_k=X^\top W_g y_g$. We perform this step using two calls to cublasDtrsv in a custom functor, parallelizing across genes, executed with \code{for\_each}. 
+Simulation from this distribution is accomplished by transforming a standard multivariate normal draw with identity covariance, $Z_k$, and setting $\tilde{\beta}_k = \Lambda^{1\frac{1}{2}} Z_k + \hat{\beta}_k$. Computation of $\hat{\Lambda}_k$ not actually done, rather is the corresponding precision matrix is computed by summing existing summaries  and parameters (\code{for\_each}) and then performing in-place Cholesky decomposition. $\hat{\beta}_k$ is then calculated with solving  $(\hat{\Lambda}_k^{\frac{1}{2}})^2\hat{\beta}_k=X^\top W_g y_g$. We perform this step using two calls to cublasDtrsv in a custom functor, parallelizing across genes, executed with \code{for\_each}.
+
+\subsection{Cluster weights}
+
+\subsection{Mass parameter}
+
+\section{Timing analysis}
+
+
+\section{Discussion}
+
 % \[Y_{g}|Z_g \sim N(X\beta_{z[g]}, \sigma^2)\]
 % \[Z_g \stackrel{iid}{\sim} Categorical(K, \pi)\]
 % \[\beta_k \stackrel{iid}{\sim} N(0,1)\]
