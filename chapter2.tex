@@ -1,11 +1,19 @@
 %math macros; figure out where these belong.
 \newcommand{\ind}{\stackrel{ind.}{\sim}}
 \newcommand{\op}{\operatorname}
+\newcommand{\code}{\texttt}
+
+\section{Introduction}
+We consider the problem where we desire to model $Y_{gi} \ind \op{N}(x_i^\top \beta_g, \frac{\sigma^2_g}{w_{gi}}$, $g=1,\ldots,G$, $i=1,\ldots,N$ and $G\gg N$. A common approach in this case, to regularize inference on $\beta_g$, is to assume that $\beta_g$ are independent, identically distributed according to some probability distribution $\mathcal{P}$ which belongs to a specific parametric family of distributions. $\mathcal{P}$ is then estimated and conditioned on, or a prior is put on its parameters and inference proceeds. While this approach can be useful in practice, the influence of the choice of a particular parametric family ought to be considered. This choice is often not made from a priori knowledge, but out of custom or convenience. We propose the use of a nonparameteric model for $\beta_g$ to avoid influencing results due to an arbitrary choice of a parameteric model while allowing for borrowing of information across genes to regularize inference.
+
+Substantial effort has gone into methods for differential gene expression that take into account the mean-variance relationship evident in RNA-seq data \cite{edger2010}\cite{deseq2014},. This seems to indicate that a joint model, $(\beta_g, \sigma^2_g) \sim \mathcal{P}$, is appropriate. In our experience, plots of empirical estimates of $\beta_g$ (estimated on the log scale) suggest unusual dependency structures among some components and distributional shapes, displaying features such as mulitmodality, spikes and heavy tails which are not easily characterized. 
+
+To avoid sensitivity to the prior distribution on $\mathcal{P}$, we propose to model it as a truncated Dirichlet process. Advances in computers have seen a rapid increase in the use of Markov Chain Monte Carlo (MCMC) methods for fitting sophisticated statistical models. Because such methods rely on thousands or even millions of simluated draws generated one after another, fast computing is critical to making them computationally feasible. Nonparametric Bayesian methods are no different in this regard, but when the size of the data set gets moderately large, the computational effort required per draw can be enormous as the number of parameters grows with the sample size. Graphics processing units (GPUs) have potential in this area, provided that most of the work can be divided into many parallel tasks which operate on different pieces of memory. By exploiting conditional independence in the model and making use of parallelized algorithms, we demonstrate the feasibility of nonparametric Bayesian modeling in the ``big data" setting of gene expression data.
 
 \section{Model}
-Let $Y_{gci}$ represent the observed expression (possibly after transformation) for gene $g$, condition $c$, replicate $i$. Let $x_{ci}^\top$ be the row of the design matrix $X$ corresponding to replicate $i$ with condition $c$. We will use the upper case letters $G$, $C$ to denote the number of genes, and conditions and let $N$, $N_c$ denote the total number of samples, and the number of replicates with condition $c$, respectively. Note that one may wish to control for other experimental or technical factors, represented as columns in the design matrix, so that $x_{ci} \neq x_{cj}$ for $i \neq j$. However, we will assume that the number of columns in $X$ is less that $N$. For the observed data, we assume the model
+Let $Y_{gci}$ represent the observed expression (possibly after transformation) for gene $g$, condition $c$, replicate $i$. Let $x_{ci}^\top$ be the row of the design matrix $X$ corresponding to replicate $i$ with condition $c$. We will use the upper case letters $G$, $C$ to denote the number of genes, and conditions and let $N$ denote the total number of samples. In addition, we accomodate possible quality weights, $w_{gci}$.  Note that one may wish to control for other experimental or technical factors, represented as columns in the design matrix, so that $x_{ci} \neq x_{cj}$ for $i \neq j$. However, we will assume that $p$,  the number of columns in $X$, is less that $N$. For the observed data, we assume the model
 \begin{equation}
-Y_{gci} \sim \op{N} \left( x_{ci}^\top \beta_g, \sigma^2_g \right).
+Y_{gci} \sim \op{N} \left( x_{ci}^\top \beta_g, \frac{\sigma^2_g}{w_{gci}} \right).
 \end{equation}
 Next, we propose to model jointly
 
@@ -17,12 +25,12 @@ where we define
 \begin{equation}
 \mathcal{P} =\sum_{k=1}^\infty \pi_k \delta_{\left(\tilde{\beta}_k^\top ,\tilde{\sigma}^2_k\right)}.
 \end{equation}
-Here $\delta_{(.)}$ is the Dirac delta function. The so-called ``atoms" of this infinite mixture of degenerate distributions are themselves modeled as random variables with the distribution given by
+Here $\delta_{(.)}$ is the Dirac delta function. The ``atoms" of this infinite mixture of degenerate distributions are themselves modeled as random variables with the distribution given by
 
 \begin{equation}
-\tilde{\beta}_k \ind \op{N}(\eta, \tau^2),\quad \tilde{\sigma}_k \ind \op{IG}(\gamma, \lambda).
+\tilde{\beta}_k \ind \op{N}(\eta, \Lambda),\quad \tilde{\sigma}_k \ind \op{IG}(\gamma, \lambda).
 \end{equation}
-The mixture weights, $\pi_k$,  are assumed to follow a stick-breaking process introduced by \citet{sethuraman}. Using the reparameterization,
+The mixture weights, $\pi_k$,  are assumed to follow a stick-breaking process \citep{sethuraman}. Using the reparameterization,
 
 \begin{equation}
 \nu_k = \frac{\pi_k}{1 - \sum_{l=1}^{k-1} \pi_l},
@@ -30,16 +38,80 @@ The mixture weights, $\pi_k$,  are assumed to follow a stick-breaking process in
 
 $\nu_k$ representing a proportion of the total probability remaining after $k-1$ breaks, we assume
 \begin{equation}
-\nu_k \ind \op{Beta}(1, \alpha),
+\nu_k \ind \op{Beta}(1, \alpha).
 \end{equation}
 
-inducing a stochastic ordering of the weights. The parameter $\alpha$ plays an important role in the model, as it controls the rate of decay in these weights. In order to allow the data to aid in determining an appropriate value, we assume the following prior on $\alpha$:
+Note that $\sum_{k=1}^K \pi_k \rightarrow 1$ as $K\rightarrow \infty$. Additionally, this assumption induces a decreasing stochastic ordering of the weights. The parameter $\alpha$ plays an important role in the model, as it controls the rate of decay in these weights. In order to allow the data to lend information about $\alpha$, we assume the following prior on $\alpha$:
 \begin{equation}
 \alpha \sim \op{Gamma}(\Gamma, \Omega).
 \end{equation}
+
+The hyperparameters in this model are $\eta, \,\Lambda, \,\gamma, \,\lambda, \,\Gamma$ and $\Omega$. Of these the first four are important with respect to the efficiency of our sampling algorithm. Values leading to a diffuse distribution for the atoms will result in many unrealistic proposals and a slow exploration of the posterior. The last two imply a probable range on the number of relevant atoms/clusters.
+
+\subsection{Data augmentation and truncation}
+To help construct a Gibbs sampler for this model, we use the ``augmented data" approach \cite{tanner}. Let $\zeta_g$ be a random variable taking values on the positive integers with prior distribution given by $Pr(\zeta_g=k)=\pi_k$. By conditioning on these allocation parameters, all $\tilde{\beta}_k$ are conditionally independent given $y$. Also, $\pi$ only depends on the data through $\zeta$.
+
+We can acheive conditional independence among the $\zeta$ by approximating the unknown infinite mixture $\mathcal{P}$ by a a truncation approximation, $\mathcal{P}_K$. We do this by setting $\nu_K=1$, or equivalently, setting $\pi_K = 1 - \sum_{k<K} \pi_k$. This approximation was proposed by \citet{ishwaran2000}. The authors showed a method for selecting $K$ sufficiently large so as to make the difference between $\mathcal{P}$ and $\mathcal{P}_K$ arbitrarily small with respect $\mathcal{L}_1$ distance. 
+
+In general, scientific questions will be restricted to those which can be formulated as sets of linear inequalities in $\beta_g$. 
 %question: in genes with small counts, does this assumption lead to multimodality in posterior for beta_g?
 
+\subsection{Posterior distribution}
+Applying Bayes' theorem, the posterior distribution, up to a constant, is
+\begin{equation*}
+p(\beta,\sigma^2,\mathcal{P}|y) = p(\zeta, \tilde{\beta},\tilde{\sigma^2},\nu | y) \propto p(y|\tilde{\beta},\tilde{\sigma^2},\zeta) p(\zeta|\nu) p(\nu|\alpha)p(\tilde{\beta},\tilde{\sigma^2})
+\end{equation*}
+\begin{equation*}
+= \prod_{g=1}^G \left\{ \op{N}(y_g;\,\beta_{\zeta_g},\sigma^2_{\zeta_g})\; \op{Cat}(\zeta_g;\, \pi(\nu)) \right\} \prod_{k=1}^K \left\{ \op{Be}(\nu_k;\, 1, \alpha)\; \op{N}(\tilde{\beta_k};\,\eta, \tau^2)\;\op{IG}(\tilde{\sigma}^2_k;\,\gamma,\lambda)\right\} \op{G}(\alpha;\Gamma,\Omega) 
+\end{equation*}
+The first equality follows from the  invariance to reparameterization of the posterior distribution, and the last equality follows from the product rule of conditionally independent random variables.
 
+\section{Parallel computation routines with CUDA}
+\subsection{Parallel reductions with Thrust}
+\subsection{Parallel scans with Thrust}
+\subsection{Parallel sampling with CURAND}
+\subsection{Linear algebra with CUBLAS}
+
+\section{Sampling from full conditionals}
+Owing to conjugacy, the full conditional distributions have simple closed form expressions. By drawing from each full conditional per iteration of the Markov chain, the sequence of draws converge to a set of draws from the posterior distribution.
+
+Insofar as the computation for these full conditionals depends on the data, it is only through summary statistics, which can be partially pre-computed (at the gene level). Therefore, $y_g^\top W_g y_g$, $y_g^\top W_g X$, and $X^\top W_g X$ are computed once, prior to sampling, and saved in device memory. Also, in order to coalesce memory accesses for different steps, $\{y_g^\top W_g X\}_{1:G}$ is stored in two ways; continguous gene-wise, and continguous
+element-wise.
+
+\subsection{Allocation parameters}
+The allocation parameters, $\zeta_g$ are conditionally independent given $\pi, \beta, \sigma^2$ and the full conditional distribution is given by
+
+\begin{equation}
+\label{zetafull}
+Pr(\zeta_g=k|\cdot) \propto \pi_k \op{N}(y_g;X\tilde{\beta}_k,\tilde{\sigma}_k^2 W_g),
+\end{equation}
+thus requiring multinomial sampling.
+
+The computational complexity for this step is $O(GKp^2)$. Fortunately, computation of the unnomalized multinomial weights is an embarassingly parallel problem. For numerical stability, these weights are computed on the log scale. From (\ref{zetafull}),
+\begin{equation}
+\label{logweight}
+\log Pr(\zeta_g=k|cdot) = constant + \log \pi_k + -N \log \sigma_k - \frac{1}{2\sigma^2_k}\left(y_g^\top W_g y_g - 2y_g^\top W_g X \beta_k + \beta^\top X^\top W_g X \beta \right).
+\end{equation}
+
+In our implementation, first, separate kernels compute a) $y_g^\top W_g X \beta_k$ and b) $\beta^\top X^\top W_g X \beta$. The first can be posed as a matrix multiplcation problem, $B^\top D$, where $\tilde{\beta}_k$ form the columns of $B$, and $X^\top W_g y_g$ form the columns of $D$, which can be resolved using the dgemm routine via the CUBLAS API. The second is accomplished through a call to the use of a custom functor with a call to \code{for\_each}, operating on a \code{zip\_iterator} formed from a \code{tuple} of \code{permutation\_iterator}s which permit random access to the leading positions of the continguous blocks of memory containing $\tilde{\beta}_k$ and $X^\top W_g y_g$. Finally, having reduced the variables to five scalars, (\ref{logweight}) is calculated, again using \code{for\_each} using a \code{zip\_iterator}.
+
+To perform the multinomial sampling, we require a cumulative sum of the weights (using log-sum-exp for numerical stability) for each gene. A parallelized routine is implemented by \code{thrust::inclusive\_scan\_by\_key}. Let $S_{g,k}$ denote the $k^{th}$ partial log sum for gene $g$. Next, random uniform variates, $U_g \sim \op{U}(0,1)$ are drawn using the CUBLAS device API, which are transformed using the total log sum, $S_{g,K}$, to $V_g = \log U_g - S_{g,K}$. Using a custom functor, operating on a \code{zip\_iterator} of a \code{tuple} containing iterators to the $V_g$, the cumulative log weights and an integer array with the same dimensions, each partial log sum is compared with the corresponding $V_g$, resulting in zero if $V_g<S_g$ and one otherwise. Finally, the multinomial draw is evaluated using \code{thrust::reduce\_by\_key}, which performs parallel reductions of the indicators, writing these to $\zeta$.
+
+\subsection{Cluster components}
+Conditional on the allocation parameters, the full conditionals for $\tilde{\beta}_k$ and $\tilde{\sigma}^2_k$ are straightforward. Importantly, $\tilde{\beta}_k$ are conditionally independent and so are $\tilde{\sigma}^2_k$. However, for a given $k$, the full conditional for $\tilde{\beta}_k$ depends on $\tilde{\sigma}^2_k$, and visa versa. Hence, this represents a Gibbs-within-Gibbs.
+
+A prerequisite to drawing from these distributions is to compute cluster summary statistics. We, again, use \code{thrust::reduce\_by\_key} for this. However, this algorithm assumes elements to be reduced are contiguous. Rather than sorting (and copying) the data, only $\zeta$ is sorted, via \code{sort\_by\_key}, which is used to produce a mapping index. Then, \code{reduce\_by\_key} can be called using \code{permutation\_iterator}s instead.
+
+The full conditional for cluster location, $\tilde{\beta}_k$:
+
+\begin{equation}
+p(\tilde{\beta}_k|\cdot) \propto \prod_{g:\zeta_g=k} \op{N}(y_g;\,X\tilde{\beta}_k, \sigma^2_gW^{-1}_g)\,\op{N}(\tilde{\beta}_k, \eta, \Lambda)
+\end{equation}
+\begin{equation*}
+\implies p(\tilde{\beta}_k|\cdot) = \op{N}(\tilde{\beta}_k; \hat{\beta}_k,\, \hat{\Lambda}_k), \mbox{ where }\hat{\Lambda}_k= \left( \sigma^{-2}_g\sum_{g:\zeta_g=k} X^\top W_g X + \Lambda^{-1} \right)^{-1}, \mbox{ and }\hat{\beta}_k=\hat{\Lambda}_k \sum_{g:\zeta_g=k} X^\top W_g y_g
+\end{equation*}
+
+Simulation from this distribution is accomplished by transforming a standard multivariate normal draw with identity covariance, $Z_k$, and setting $\tilde{\beta}_k = \Lambda^{1\frac{1}{2}} Z_k + \hat{\beta}_k$. Computation of $\hat{\Lambda}_k$ not actually done, rather is the corresponding precision matrix is computed by summing existing summaries  and parameters (\code{for\_each}) and then performing in-place Cholesky decomposition. $\hat{\beta}_k$ is then calculated with solving  $(\hat{\Lambda}_k^{\frac{1}{2}})^2\hat{\beta}_k=X^\top W_g y_g$. We perform this step using two calls to cublasDtrsv in a custom functor, parallelizing across genes, executed with \code{for\_each}. 
 % \[Y_{g}|Z_g \sim N(X\beta_{z[g]}, \sigma^2)\]
 % \[Z_g \stackrel{iid}{\sim} Categorical(K, \pi)\]
 % \[\beta_k \stackrel{iid}{\sim} N(0,1)\]
@@ -89,6 +161,5 @@ inducing a stochastic ordering of the weights. The parameter $\alpha$ plays an i
 % 
 % Precalculating $X^Ty$ (or $y^TX$) for each gene can be done once and stored in global memory.
 
-\end{document}
 
-\section{Posterior distribution}
+
