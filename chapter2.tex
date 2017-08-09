@@ -4,13 +4,12 @@
 \newcommand{\code}{\texttt}
 
 \section{Introduction}
-Considering a problem to be modeled by $Y_{gi} \ind F(\theta_{g})$, $g=1,\ldots,G$, $i=1,\ldots,N$ with $G\gg N$. In these situations, there is a need for some kind of regularization with respect to inference for $\theta$. A common approach is to assume that the $\theta_g$ are independent, identically distributed according to some probability distribution, $\mathcal{P}$, belonging to a parametric family of distributions. Under this framework, $\mathcal{P}$ can then be estimated allowing for conditional inference, or a prior distribution can be given on its parameters allowing for fully Bayesian inference. While this approach can be useful in practice, the influence of the choice of a particular parametric family can be considerable. (Insert example?) This choice is often not reflective of a priori information, instead it usually conventional or due to convenience. The Dirichlet process mixture model has been proposed, which avoids making parameteric assumptions about $\mathcal{P}$ to avoid undue influence of such choices, while still allowing for borrowing of information across groups to regularize inference.
+Considering a problem to be modeled by $Y_{gi} \ind F(\theta_{g})$, $g=1,\ldots,G$, $i=1,\ldots,N$ with $G\gg N$. In these situations, there is a need for some kind of regularization with respect to inference for $\theta$. A common approach is to assume that the $\theta_g$ are independent, identically distributed according to some probability distribution, $\mathcal{P}$, belonging to a parametric family of distributions. Under this framework, $\mathcal{P}$ can then be estimated allowing for conditional inference, or a prior distribution can be given on its parameters allowing for fully Bayesian inference. While this approach can be useful in practice, the influence of the choice of a particular parametric family can be considerable. (Insert example?) This choice is often not reflective of a priori information, instead it usually conventional or due to convenience. The Dirichlet process (DP) mixture model has been proposed, which avoids making parameteric assumptions about $\mathcal{P}$ to avoid undue influence of such choices, while still allowing for borrowing of information across groups to regularize inference.
 
-Good algorithms exist for fitting these models using Gibbs sampling \cite{neal2000}. In high-dimensions, however, these algorithms are not computationally tractable. \citet{suchard} proposed algorithms for ``massive" mixture models that target graphics processing units (GPUs), which use the inherent parallel processing power to acheive large speed-ups in computation time. In this paper we describe an implementation of the approach outlined by \citet{suchard} in an application to gene expression data.
+A number of Gibbs sampling algorithms for MCMC have been proposed, based on a marginalized model, where the random measure $\mathcal{P}$ has been integrated out \cite{neal2000}. However, in high-dimensions, i.e., large $G$, these algorithms are not computationally tractable. The ``stick-breaking" representation of the DP\citet{suchard} proposed algorithms for ``massive" mixture models that target graphics processing units (GPUs), which use the inherent parallel processing power to acheive large speed-ups in computation time. In this paper we describe an implementation of the approach outlined by \citet{suchard} with applications to gene expression data.
 
 Substantial effort has gone into methods for analyzing gene expression \cite{edger2010},\cite{deseq2014}. Existing methods take pains to account for the mean-variance trend, empirically evident, which can vary from data set to data set. Similarly, plots of empirical estimates of $\beta_g$, coefficients of regression on a log scale, suggest complex structures of dependency among some components of $\beta_g$. These show distributional shapes -- features such as mulitmodality, spikes and heavy tails -- which are not easily characterized by a parametric distribution. These observations seem to suggest two things: a) a joint model, $(\beta_g, \sigma^2_g) \ind \mathcal{P}$, should be useful, by providing a means for regularizing inference that accounts for dependence between components, and b) the prior distribution for $\mathcal{P}$ should spread prior mass over a large distributional space.
 
-\section{Outline}
 Section \ref{sec:model} presents a hierarchical regression model for gene expression with truncated Dirichlet process prior. The full posterior distribution is given in subsection \ref{subsec:posterior}. Section \ref{sec:computation} offers general remarks regarding the implementation strategy. Subsections \ref{subsec:upsweep} and \ref{subsec:downsweep} provide some introductory material regarding parallel algorithms. The rest of this section describes the libraries and tools which were useful in developing our application. Section \ref{sec:implement} describes the details of our implementation, concentrating on the steps for the Gibbs sampler, which are at the core of our method. In subsection \ref{subsec:output} we consider how we cope with the memory bottleneck, which prevents storing most MCMC samples. Section \ref{sec:timing} presents a study of the rate of mixing for different sized data sets and sampler settings. In the final section, we consider some extensions...
 % In summary, to avoid sensitivity to the prior distribution on $\mathcal{P}$, we propose to model it as a truncated Dirichlet process. Advances in computers have seen a rapid increase in the use of Markov Chain Monte Carlo (MCMC) methods for fitting sophisticated statistical models. Because such methods rely on thousands or even millions of simluated draws generated one after another, fast computing is critical to making them computationally feasible. Nonparametric Bayesian methods are no different in this regard, but when the size of the data set gets moderately large, the computational effort required per draw can be enormous as the number of parameters grows with the sample size. Graphics processing units (GPUs) have potential in this area, provided that most of the work can be divided into many parallel tasks which operate on different pieces of memory. By exploiting conditional independence in the model and making use of parallelized algorithms, we demonstrate the feasibility of nonparametric Bayesian modeling in the ``big data" setting of gene expression data.
 
@@ -57,7 +56,7 @@ The hyperparameters in this model are $\eta, \,\Lambda, \,\gamma, \,\lambda, \,\
 \label{subsec:reparam}
 To help construct a Gibbs sampler for this model, we use the ``augmented data" approach \cite{tanner}. Let $\zeta_g$ be a random variable taking values on the positive integers with prior distribution given by $Pr(\zeta_g=k)=\pi_k$. By conditioning on these allocation parameters, all $\tilde{\beta}_k$ are conditionally independent given $y$. Also, $\pi$ only depends on the data through $\zeta$.
 
-We can acheive conditional independence among the $\zeta$ by approximating the unknown infinite mixture $\mathcal{P}$ by a a truncation approximation, $\mathcal{P}_K$. We do this by setting $\nu_K=1$, or equivalently, setting $\pi_K = 1 - \sum_{k<K} \pi_k$. This approximation was proposed by \citet{ishwaran2000}. The authors showed a method for selecting $K$ sufficiently large so as to make the difference between $\mathcal{P}$ and $\mathcal{P}_K$ arbitrarily small with respect $\mathcal{L}_1$ distance. 
+We can acheive conditional independence among the $\zeta$ by approximating the unknown infinite mixture $\mathcal{P}$ by a truncated, finite mixture approximation to the Dirichlet process. $\mathcal{P}_K$. We do this by setting $\nu_K=1$, or equivalently, setting $\pi_K = 1 - \sum_{k<K} \pi_k$. This approximation was proposed by \citet{ishwaran2000}. The authors showed a method for selecting $K$ sufficiently large so as to make the difference between $\mathcal{P}$ and $\mathcal{P}_K$ arbitrarily small with respect $\mathcal{L}_1$ distance. 
 
 In general, scientific questions will be restricted to those which can be formulated as sets of linear inequalities in $\beta_g$. 
 %question: in genes with small counts, does this assumption lead to multimodality in posterior for beta_g?
@@ -73,9 +72,26 @@ p(\beta,\sigma^2,\mathcal{P}|y) = p(\zeta, \tilde{\beta},\tilde{\sigma^2},\nu | 
 \end{equation*}
 The first equality follows from the  invariance to reparameterization of the posterior distribution, and the last equality follows from the product rule of conditionally independent random variables.
 
-\section{Parallel computation}
+\section{Computation on the GPU}
 \label{sec:computation}
-\subsection{Parallel reductions with Thrust}
+\subsection{General Remarks}
+Modern GPUs offer hundreds or thousands of cores that can all execute a program concurrently. This is a big advantage over multi-core CPUs which typically have fewer than ten processors. If one decides to implement a program using a GPU, there are contraints that they need to be aware of.
+\begin{itemize}
+\item
+In the usual set-up, the main program in run on a CPU which turns over control periodically to the GPU to run specific tasks. These tasks, or ``kernels", follow the single instruction, multiple data (SIMD) paradigm. Each core on the GPU is assigned to work on a specific chunk of memory, but all cores execute the same program. Each instance of the program is called a ``thread". It is desirable to avoid branching logic in kernels, in part because the GPU cores are relatively slow, so branching can easily lead to high latency. The best results are obtained by having all threads proceed in lockstep.
+
+\item
+The GPU has its own memory system. Because copying memory from host (CPU) to device (GPU) and visa versa is slow, if possible, data input should be copied only once from the host CPU to GPU memory and when the task is completed, it should be copied once back only once to the CPU.
+
+\item
+When programming for the CPU, memory accesses tend to be fast. On the GPU, while the thread local memory is fast, its size is limited, and reading and writing from global memory is slow. Therefore, kernels need to limit both reads and memory allocation, or else the potential gain in speed due to parallelism will be lost due to memory bottlenecks.
+
+\item
+Threads are themselves organized into ``warps". When data is read from global memory, it reads not one address at a time, but in chunks to minimize overhead costs. To take advantage of this, consecutively indexed threads should use data from memory at consecutive addresses. When this happens, the reads are ``coalesced". If consecutive threads access addresses that are distant to one another, reads are not coalesced, which will make memory transfer inefficient, hence the program will tend to be slow.
+\end{itemize}
+
+\subsection{Routines}
+\subsubsection{Reductions}
 \label{subsec:reduce}
 On the GPU, individual processors are slow, memory transfer is slow, and asynchronous tasks can result in many idle threads. In order to acheive speed-ups, algorithms must exploit parallelism and must do so in a way that respects the limitations of the hardware. A simple example is reduction. Given some data in memory, $x_1, x_2, \ldots, x_n$, and an \textit{associative} operator $\oplus$, the problem is to compute $x_1 \oplus x_2 \oplus \ldots \oplus x_n$. 
 
@@ -90,12 +106,14 @@ On the GPU, individual processors are slow, memory transfer is slow, and asynchr
 \RETURN{a}
 \end{pseudocode}
 
-Assuming no constraint on the number of processors, algorithm \ref{upsweep} describes a GPU-friendly way to tackle this problem. In the first iteration of the outer loop, the inner loop keeps a maximal number of threads are busy with an identical task, requiring similar and parallel memory accesses, two reads and one write. While half of these threads become idle in subsequent loops, the active threads always write to the same place. In practice, there are constraints on the number of threads and memory is not flat, as assumed in this simple example. CUDA users who want to take advantage of GPU parallelism without concerning themselves with the optimization should be aware of the Thrust library \cite{thrust}. Thrust is based on the C++ Standard Template Library and provides both containers for handling allocation and deallocation of device memory as well as generic algorithms, such as \code{thrust::reduce}.
+Assuming no constraint on the number of processors, algorithm \ref{upsweep} describes a GPU-friendly way to tackle this problem. In the first iteration of the outer loop, the inner loop keeps a maximal number of threads are busy with an identical task, requiring similar and parallel memory accesses, two reads and one write. While half of these threads become idle in subsequent loops, the active threads always write to the same place. In practice, since device memory is not flat, as was discussed in the previous subsection, an optimal implementation would make use of shared memory after the first read. Reading and writing from shared memory is much faster than from global memory and is accessible to all threads in a block.
+
+% CUDA users who want to take advantage of GPU parallelism without concerning themselves with the optimization should be aware of the Thrust library \cite{thrust}. Thrust is based on the C++ Standard Template Library and provides both containers for handling allocation and deallocation of device memory as well as generic algorithms, such as \code{thrust::reduce}.
 
 
 %\caption{Parallel reduction of $n=2^d$ elements (upsweep step of scan). Upon return, total is stored in $a[n]$.}
 
-\subsection{Parallel scans with Thrust}
+\subsubsection{Scans}
 \citet{blelloch1990} described a general algorithm for computing $x_1,
 x_1 \oplus x_2, \ldots, x_1 \oplus \ldots \oplus x_n$. This result is required at multiple points in our MCMC algorithm. An example is the calculation of cumulative probabilities in multinomial sampling. (In this case, the probabilities are on the log scale for stability, so that $\oplus=\log(e^{x_1}+e^{x_2})$.) The natural serial algorithm, $z_1 = x_1,\;z_2 = z_1 \otimes x_2,\dots$, is ill-suited to the GPU. Blelloch showed that there is an efficient parallel alternative. The simple case of an array with $2^d$ elements and $2^{d-1}$ processors consists of a parallel reduction (``upsweep"; algorithm \ref{upsweep}), followed by a downsweep (algorithm \ref{downsweep}. Given an input array $a$, the algorithm modifies the input with the result that each element contains the sum of all the previous elements in the original. In some cases this is the desired result; otherwise, the array is shifted to the right and the total from the upsweep is appended. In case that the number of threads is restricted, a solution is to divide the data up among the processors and perform a reduction on each subset. Next, a prescan can be performed on the processor totals, which are stored to memory. Finally, a series of scans can be performed on the subsets as desired, using the scanned processor totals as offsets \cite{blelloch1990}.
 \begin{pseudocode}[ruled]{Prescan}{a}
@@ -115,27 +133,26 @@ a[n] \GETS 0\\
 
 
 If $P$ processors are available
-the time required goes from to process $n$ elements is $O(n)$ to $O(n/P + \log_2P)$ vs $O(n)$ for the serial algorithm. This is the same order as for the parallel reduction. Parallel scans are implemented in Thrust, called with \code{inclusive\_scan} for a full scan and \code{exclusive\_scan} for a prescan.
+the time required to scan $n$ elements is on the order $O(n/P + \log_2P)$, versus $O(n)$ for the serial algorithm. This is the same as the parallel reduction.
+% Parallel scans are implemented in Thrust, called with \code{inclusive\_scan} for a full scan and \code{exclusive\_scan} for a prescan.
+
+\subsubsection{Pseudo-random number generation}
+Schemes for pseudo-random number generation (PRNG) in parallel have been developed. Since PRNGs are deterministic and sequential, a natural parallel adaptation is access the same sequence at locations distant enough to avoid overlap or to use a strided access pattern.
+
+% Parallel uniform and normal random number generation. For the (inverse) gamma draws, the method of \citet{simplegamma} is used, pairs of which can be transformed to produce beta draws.
+
+\subsubsection{Linear algebra}
+For computationally intensive tasks, such as matrix multiplication, much of the work can be done independently. Because much of the work requires repeated use of the same data, however, the optimal solution depends on both the hardware and the size of the problem. Fortunately, much of this work has already been done. Just as is the case in plain C, it is recommended to use APIs to optimized, documented libraries which are being developed and made available for GPUs.
+% Many LAPACK/BLAS routines, including matrix multiplication, solving lower triangular matrix equations, matrix-vector multiplication and dot product.
 
 
-
-\subsection{Parallel sampling with CURAND}
-Parallel uniform and normal random number generation. For the (inverse) gamma draws, the method of \citet{simplegamma} is used, pairs of which can be transformed to produce beta draws.
-
-\subsection{Linear algebra with CUBLAS}
-Many LAPACK/BLAS routines, including matrix multiplication, solving lower triangular matrix equations, matrix-vector multiplication and dot product.
-
-
-\section{Implementation}
-\label{sec:implement}
-\subsection{Sampling from full conditionals}
-\label{subsec:fullcond}
-Owing to conjugacy, the full conditional distributions have simple closed form expressions. By drawing from each full conditional per iteration of the Markov chain, the sequence of draws converge to a set of draws from the posterior distribution.
-
-Insofar as the computation for these full conditionals depends on the data, it is only through summary statistics, which can be partially pre-computed (at the gene level). Therefore, $y_g^\top W_g y_g$, $y_g^\top W_g X$, and $X^\top W_g X$ are computed once, prior to sampling, and saved in device memory. Also, in order to coalesce memory accesses for different steps, $\{y_g^\top W_g X\}_{1:G}$ is stored in two ways; continguous gene-wise, and continguous
-element-wise.
-
-\subsubsection{Allocation parameters}
+\section{MCMC}
+\label{sec:mcmc}
+\subsection{Full conditionals}
+\label{subsec:full-cond}
+Our blocked Gibbs sampler is constructed as follows:
+\begin{enumerate}
+\item[Step 1:]
 The allocation parameters, $\zeta_g$ are conditionally independent given $\pi, \beta, \sigma^2$ and the full conditional distribution is given by
 
 \begin{equation}
@@ -144,6 +161,62 @@ Pr(\zeta_g=k|\cdot) \propto \pi_k \op{N}(y_g;X\tilde{\beta}_k,\tilde{\sigma}_k^2
 \end{equation}
 thus requiring multinomial sampling.
 
+\item[Step 2:] Conditional on the allocation parameters, the full conditionals for $\tilde{\beta}_k$ and $\tilde{\sigma}^2_k$ are straightforward. Importantly, $\tilde{\beta}_k$ are conditionally independent and so are $\tilde{\sigma}^2_k$. However, for a given $k$, the full conditional for $\tilde{\beta}_k$ depends on $\tilde{\sigma}^2_k$, and visa versa. Hence, this represents a Gibbs-within-Gibbs.
+  \begin{enumerate}
+  \item[(a)] The full conditional for cluster location, $\tilde{\beta}_k$:
+    \begin{equation}
+      p(\tilde{\beta}_k|\cdot) \propto \prod_{g:\zeta_g=k} \op{N}(y_g;\,X\tilde{\beta}_k, \sigma^2_gW^{-1}_g)\,\op{N}(\tilde{\beta}_k; \eta, \Lambda)
+    \end{equation}
+    \begin{equation*}
+      \implies p(\tilde{\beta}_k|\cdot) = \op{N}(\tilde{\beta}_k; \hat{\beta}_k,\, \hat{\Lambda}_k),
+    \end{equation*}
+    \begin{equation*}
+    \mbox{ where }\hat{\Lambda}_k= \left( \sigma^{-2}_g\sum_{g:\zeta_g=k} X^\top W_g X + \Lambda^{-1} \right)^{-1}, \mbox{ and }\hat{\beta}_k=\hat{\Lambda}_k \sum_{g:\zeta_g=k} X^\top W_g y_g
+    \end{equation*}
+  \item[(b)] The full conditional for cluster variance, $\tilde{\sigma}_k^2$, is:
+    \begin{equation}
+      p(\tilde{\sigma}_k^2|\cdot) \propto \prod_{g:\zeta_g=k} \op{N}(y_g;\,X\tilde{\beta}_k, \sigma^2_gW^{-1}_g) \op{IG}(\tilde{\sigma}_k^2; \gamma, \lambda)
+    \end{equation}
+    \begin{equation*}
+      \implies p(\tilde{\sigma}_k^2|\cdot) = \op{IG}(\hat{\gamma}_k,\hat{\lambda}_k), 
+    \end{equation*}
+    \begin{equation*}
+      \mbox{ where }\hat{\gamma}_k = \gamma + \frac{NM_k}{2},\mbox{ and }\hat{\lambda}_k= \lambda + \sum_{g:\zeta_g=k}y_g^\top W_g y_g -2 \beta_g^\top X^\top W_g y_g  +\beta_g^\top X^\top W_g X \beta_g
+    \end{equation*}
+
+    Here $M_k$ is the number of $g$ for which $\zeta_g = k$. 
+  \end{enumerate}
+\item[Step 3:] The full conditional for $\nu_k$ depends only on $M_k(\zeta)$. The full conditional is:
+
+  \begin{equation}
+    p(\nu_k) \propto \prod_{l \ge k} \prod_{g:\zeta_g=k} \pi_k \; \op{Be}(\nu_k; 1, \alpha) \propto \nu_k^{M_k + 1}(1-\nu_k)^{\sum_{l > k} M_l + \alpha} 
+  \end{equation}
+  \begin{equation*}
+    \implies p(\nu_k)=\op{Be}(M_k + 1, \sum_{l>k}M_l + \alpha)
+  \end{equation*}
+\item[Step 4:]
+  The mass parameter, $\alpha$, has a conjugate gamma prior, and depends only on $\nu$. Its full conditional is:
+
+  \begin{equation}
+    p(\alpha|\cdot) \propto \prod_{k=1}^{K-1} \op{Be}(\nu_k;1, \alpha) \; \op{Ga}(\alpha;\Gamma,\Omega)
+\propto \alpha^{(K-1) + \Gamma - 1} \left(\prod_{k=1}^{K-1} (1-\nu_k)\right)^\alpha e^{-\Omega \alpha} 
+  \end{equation}
+  \begin{equation*}
+    = \alpha^{(K-1) + \Gamma - 1} e^{-(-\log \pi_K + \Omega) \alpha}
+  \end{equation*}
+  \begin{equation*}
+    \implies p(\alpha|\cdot) = \op{Ga}(K + \Gamma - 1, -\log \pi_K + \Omega)
+  \end{equation*}
+\end{enumerate}
+
+\subsection{Implementation}
+\label{subsec:implement}
+Owing to conjugacy, the full conditional distributions have simple closed form expressions. By drawing from each full conditional per iteration of the Markov chain, the sequence of draws converge to a set of draws from the posterior distribution.
+
+Insofar as the computation for these full conditionals depends on the data, it is only through summary statistics, which can be partially pre-computed (at the gene level). Therefore, $y_g^\top W_g y_g$, $y_g^\top W_g X$, and $X^\top W_g X$ are computed once, prior to sampling, and saved in device memory. Also, in order to coalesce memory accesses for different steps, $\{y_g^\top W_g X\}_{1:G}$ is stored in two ways; continguous gene-wise, and continguous
+element-wise.
+
+\subsubsection{Allocation parameters}
 The computational complexity for this step is $O(GKp^2)$. Fortunately, computation of the unnomalized multinomial weights is an embarassingly parallel problem. For numerical stability, these weights are computed on the log scale. From (\ref{zetafull}),
 \begin{equation}
 \label{logweight}
@@ -154,59 +227,21 @@ In our implementation, first, separate kernels compute a) $y_g^\top W_g X \beta_
 
 To perform the multinomial sampling, we require a cumulative sum of the weights (using log-sum-exp for numerical stability) for each gene. A parallelized routine is implemented by \code{thrust::inclusive\_scan\_by\_key}. Let $S_{g,k}$ denote the $k^{th}$ partial log sum for gene $g$. Next, random uniform variates, $U_g \sim \op{U}(0,1)$ are drawn using the CUBLAS device API, which are transformed using the total log sum, $S_{g,K}$, to $V_g = \log U_g - S_{g,K}$. Using a custom functor, operating on a \code{zip\_iterator} of a \code{tuple} containing iterators to the $V_g$, the cumulative log weights and an integer array with the same dimensions, each partial log sum is compared with the corresponding $V_g$, resulting in zero if $V_g<S_g$ and one otherwise. Finally, the multinomial draw is evaluated using \code{thrust::reduce\_by\_key}, which performs parallel reductions of the indicators, writing these to $\zeta$.
 
-\subsubsection{Cluster components}
-Conditional on the allocation parameters, the full conditionals for $\tilde{\beta}_k$ and $\tilde{\sigma}^2_k$ are straightforward. Importantly, $\tilde{\beta}_k$ are conditionally independent and so are $\tilde{\sigma}^2_k$. However, for a given $k$, the full conditional for $\tilde{\beta}_k$ depends on $\tilde{\sigma}^2_k$, and visa versa. Hence, this represents a Gibbs-within-Gibbs.
-
-A prerequisite to drawing from these distributions is to compute cluster summary statistics. We, again, use \code{thrust::reduce\_by\_key} for this. However, this algorithm assumes elements to be reduced are contiguous. Rather than sorting (and copying) the data, only $\zeta$ is sorted, via \code{sort\_by\_key}, which is used to produce a mapping index. Then, \code{reduce\_by\_key} can be called using \code{permutation\_iterator}s instead. For efficiency, these summaries omit unoccupied clusters. The general strategy is to allocate $K$ dimensional blocks of temporary memory to store the parameters for the full conditionals and to then use scattering operations, so that all clusters are updated concurrently. 
-
-The full conditional for cluster location, $\tilde{\beta}_k$:
-
-\begin{equation}
-p(\tilde{\beta}_k|\cdot) \propto \prod_{g:\zeta_g=k} \op{N}(y_g;\,X\tilde{\beta}_k, \sigma^2_gW^{-1}_g)\,\op{N}(\tilde{\beta}_k; \eta, \Lambda)
-\end{equation}
-\begin{equation*}
-\implies p(\tilde{\beta}_k|\cdot) = \op{N}(\tilde{\beta}_k; \hat{\beta}_k,\, \hat{\Lambda}_k), \mbox{ where }\hat{\Lambda}_k= \left( \sigma^{-2}_g\sum_{g:\zeta_g=k} X^\top W_g X + \Lambda^{-1} \right)^{-1}, \mbox{ and }\hat{\beta}_k=\hat{\Lambda}_k \sum_{g:\zeta_g=k} X^\top W_g y_g
-\end{equation*}
-
-Simulation from this distribution is accomplished by transforming a standard multivariate normal draw with identity covariance, $Z_k$, and setting $\tilde{\beta}_k = \Lambda^{1\frac{1}{2}} Z_k + \hat{\beta}_k$. Computation of $\hat{\Lambda}_k$ not actually done, rather is the corresponding precision matrix is computed by summing existing summaries  and parameters (\code{for\_each}) and then performing in-place Cholesky decomposition. $\hat{\beta}_k$ is then calculated with solving  $(\hat{\Lambda}_k^{\frac{1}{2}})^2\hat{\beta}_k=X^\top W_g y_g$. We perform this step using two calls to cublasDtrsv in a custom functor, parallelizing across genes, executed with \code{for\_each}.
+\subsubsection{Cluster atoms}
+A prerequisite to drawing from the full conditional distribution for the cluster atoms is to compute cluster summary statistics. We, again, use \code{thrust::reduce\_by\_key} for this. However, this algorithm assumes elements to be reduced are contiguous. Rather than sorting (and copying) the data, only $\zeta$ is sorted, via \code{sort\_by\_key}, which is used to produce a mapping index. Then, \code{reduce\_by\_key} can be called using \code{permutation\_iterator}s instead. For efficiency, these summaries omit unoccupied clusters. The general strategy is to allocate $K$ dimensional blocks of temporary memory to store the parameters for the full conditionals and to then use scattering operations, so that all clusters are updated concurrently. 
 
 
-The full conditional for cluster variance, $\tilde{\sigma}_k^2$, is:
+\paragraph{Cluster regression coefficients}
+Simulation from the full conditional for $\tilde{\beta}_k$ is accomplished by transforming a standard multivariate normal draw with identity covariance, $Z_k$, and setting $\tilde{\beta}_k = \Lambda^{1\frac{1}{2}} Z_k + \hat{\beta}_k$. Computation of $\hat{\Lambda}_k$ not actually done, rather is the corresponding precision matrix is computed by summing existing summaries  and parameters (\code{for\_each}) and then performing in-place Cholesky decomposition. $\hat{\beta}_k$ is then calculated with solving  $(\hat{\Lambda}_k^{\frac{1}{2}})^2\hat{\beta}_k=X^\top W_g y_g$. We perform this step using two calls to cublasDtrsv in a custom functor, parallelizing across genes, executed with \code{for\_each}.
 
-\begin{equation}
-p(\tilde{\sigma}_k^2|\cdot) \propto \prod_{g:\zeta_g=k} \op{N}(y_g;\,X\tilde{\beta}_k, \sigma^2_gW^{-1}_g) \op{IG}(\tilde{\sigma}_k^2; \gamma, \lambda)
-\end{equation}
-\begin{equation*}
-\implies p(\tilde{\sigma}_k^2|\cdot) = \op{IG}(\hat{\gamma}_k,\hat{\lambda}_k), \mbox{ where }\hat{\gamma}_k = \gamma + \frac{NM_k}{2},\mbox{ and }\hat{\lambda}_k= \lambda + \sum_{g:\zeta_g=k}y_g^\top W_g y_g -2 \beta_g^\top X^\top W_g y_g  +\beta_g^\top X^\top W_g X \beta_g
-\end{equation*}
-
-Here $M_k$ is the number of $g$ for which $\zeta_g = k$. The main hurdle here is the computation of $\hat{\lambda}$. This is done in three steps, each parallel over $k$: dot products for $\beta_k^\top \sum_{g:\zeta_g=k}X^\top W_g y_g$, quadratic forms for $\beta_k^\top\left( \sum_{g:\zeta_g=k} X^\top W_g X \right) \beta_k$ and a \code{for\_each} call to combine the terms.
+\paragraph{Cluster variance}
+For $\tilde{\sigma}^2_k$, the main hurdle for computation is the computation of $\hat{\lambda}$. This is done in three steps, each parallel over $k$: dot products for $\beta_k^\top \sum_{g:\zeta_g=k}X^\top W_g y_g$, quadratic forms for $\beta_k^\top\left( \sum_{g:\zeta_g=k} X^\top W_g X \right) \beta_k$ and a \code{for\_each} call to combine the terms.
 
 \subsubsection{Cluster weights}
-The full conditional for $\nu_k$ depends only on $M_k(\zeta)$. The full conditional is:
-
-\begin{equation}
-p(\nu_k) \propto \prod_{l \ge k} \prod_{g:\zeta_g=k} \pi_k \; \op{Be}(\nu_k; 1, \alpha) \propto \nu_k^{M_k + 1}(1-\nu_k)^{\sum_{l > k} M_l + \alpha} 
-\end{equation}
-\begin{equation*}
-\implies p(\nu_k)=\op{Be}(M_k + 1, \sum_{l>k}M_l + \alpha)
-\end{equation*}
 
 The second shape parameter can be computed for all $k<K$ using a parallel prescan (in reverse) on the $M_k$, which are defined in the previous subsection. The addition of $\alpha$ is done using the convenient \code{thrust::transform}.
 
 \subsubsection{Mass parameter}
-The mass parameter, $\alpha$, has a conjugate gamma prior, and depends only on $\nu$. Its full conditional is:
-
-\begin{equation}
-p(\alpha|\cdot) \propto \prod_{k=1}^{K-1} \op{Be}(\nu_k;1, \alpha) \; \op{Ga}(\alpha;\Gamma,\Omega)
-\propto \alpha^{(K-1) + \Gamma - 1} \left(\prod_{k=1}^{K-1} (1-\nu_k)\right)^\alpha e^{-\Omega \alpha} 
-\end{equation}
-\begin{equation*}
-= \alpha^{(K-1) + \Gamma - 1} e^{-(-\log \pi_K + \Omega) \alpha}
-\end{equation*}
-\begin{equation*}
-\implies p(\alpha|\cdot) = \op{Ga}(K + \Gamma - 1, -\log \pi_K + \Omega)
-\end{equation*}
 
 This work required for this step is trivial.
 
