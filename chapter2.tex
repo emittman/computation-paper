@@ -4,11 +4,11 @@
 \newcommand{\code}{\texttt}
 
 \section{Introduction}
-Considering a problem to be modeled by $Y_{gi} \ind F(\theta_{g})$, $g=1,\ldots,G$, $i=1,\ldots,N$ with $G\gg N$. In these situations, there is a need for some kind of regularization with respect to inference for $\theta$. A common approach is to assume that the $\theta_g$ are independent, identically distributed according to some probability distribution, $\mathcal{P}$, belonging to a parametric family of distributions. Under this framework, $\mathcal{P}$ can then be estimated allowing for conditional inference, or a prior distribution can be given on its parameters allowing for fully Bayesian inference. While this approach can be useful in practice, the influence of the choice of a particular parametric family can be considerable. (Insert example?) This choice is often not reflective of a priori information, instead it usually conventional or due to convenience. The Dirichlet process (DP) mixture model has been proposed, which avoids making parameteric assumptions about $\mathcal{P}$ to avoid undue influence of such choices, while still allowing for borrowing of information across groups to regularize inference.
+Considering the model by $Y_{gi} \ind F(\theta_{g})$, $g=1,\ldots,G$, $i=1,\ldots,N$ with $G\gg N$. In this scenario, there is a need for some kind of regularization with respect to inference for $\theta$. A common approach is to assume that the $\theta_g$ are independent, identically distributed according to some probability distribution, $\mathcal{P}$, belonging to a parametric family of distributions. Under this framework, $\mathcal{P}$ can then be estimated allowing for conditional inference, or a prior distribution can be given on its parameters allowing for fully Bayesian inference. While this approach can be useful in practice, the influence of the choice of a particular parametric family can be considerable. This choice is often not reflective of a priori information, instead it usually conventional or due to convenience. The Dirichlet process (DP) mixture model has been proposed, which avoids making parameteric assumptions about $\mathcal{P}$ to avoid undue influence of such choices, while still allowing for borrowing of information across groups to regularize inference.
 
-A number of Gibbs sampling algorithms for MCMC have been proposed, based on a marginalized model, where the random measure $\mathcal{P}$ has been integrated out \cite{neal2000}. However, in high-dimensions, i.e., large $G$, these algorithms are not computationally tractable. The ``stick-breaking" representation of the DP\citet{suchard} proposed algorithms for ``massive" mixture models that target graphics processing units (GPUs), which use the inherent parallel processing power to acheive large speed-ups in computation time. In this paper we describe an implementation of the approach outlined by \citet{suchard} with applications to gene expression data.
+Much effort has gone into methods for analyzing gene expression \cite{edger2010},\cite{deseq2014}. Existing methods attempt to account for the mean-variance trend, which can vary from data set to data set. Similarly, plots of empirical estimates of $\beta_g$, coefficients of regression on a log scale, suggest complex structures of dependency among some components of $\beta_g$. These show distributional shapes -- features such as mulitmodality, spikes and heavy tails -- which are not easily characterized by a parametric distribution. These observations seem to suggest two things: a) a joint model, $(\beta_g, \sigma^2_g) \ind \mathcal{P}$, should be useful, by providing a means for regularizing inference that accounts for dependence between components, and b) the prior distribution for $\mathcal{P}$ should spread prior mass over a large distributional space.
 
-Substantial effort has gone into methods for analyzing gene expression \cite{edger2010},\cite{deseq2014}. Existing methods take pains to account for the mean-variance trend, empirically evident, which can vary from data set to data set. Similarly, plots of empirical estimates of $\beta_g$, coefficients of regression on a log scale, suggest complex structures of dependency among some components of $\beta_g$. These show distributional shapes -- features such as mulitmodality, spikes and heavy tails -- which are not easily characterized by a parametric distribution. These observations seem to suggest two things: a) a joint model, $(\beta_g, \sigma^2_g) \ind \mathcal{P}$, should be useful, by providing a means for regularizing inference that accounts for dependence between components, and b) the prior distribution for $\mathcal{P}$ should spread prior mass over a large distributional space.
+A number of Gibbs sampling algorithms for MCMC have been proposed, based on a marginalization over the random measure $\mathcal{P}$ \citep{neal2000}. Variations of this have shown to be effective in practice. However, for large $G$, these algorithms are not computationally tractable as they require one-at-a-time updating of the cluster assignment for each $g$ conditioning on all $g'\neq g$. The ``stick-breaking" representation of the DP, due to \citet{sethuraman}, provides a way to explicitly sample $\mathcal{P}$. By conditioning on $\mathcal{P}$, the assignment of clusters can be done in parallel due to conditional independence. \citet{suchard} proposed algorithms for such ``massive" mixture models that target graphics processing units (GPUs), which use the inherent parallel processing power to acheive large speed-ups in computation time. In this paper we describe an implementation of the approach outlined by \citet{suchard}, and apply it to gene expression data.
 
 Section \ref{sec:model} presents a hierarchical regression model for gene expression with truncated Dirichlet process prior. The full posterior distribution is given in subsection \ref{subsec:posterior}. Section \ref{sec:computation} offers general remarks regarding the implementation strategy. Subsections \ref{subsec:upsweep} and \ref{subsec:downsweep} provide some introductory material regarding parallel algorithms. The rest of this section describes the libraries and tools which were useful in developing our application. Section \ref{sec:implement} describes the details of our implementation, concentrating on the steps for the Gibbs sampler, which are at the core of our method. In subsection \ref{subsec:output} we consider how we cope with the memory bottleneck, which prevents storing most MCMC samples. Section \ref{sec:timing} presents a study of the rate of mixing for different sized data sets and sampler settings. In the final section, we consider some extensions...
 % In summary, to avoid sensitivity to the prior distribution on $\mathcal{P}$, we propose to model it as a truncated Dirichlet process. Advances in computers have seen a rapid increase in the use of Markov Chain Monte Carlo (MCMC) methods for fitting sophisticated statistical models. Because such methods rely on thousands or even millions of simluated draws generated one after another, fast computing is critical to making them computationally feasible. Nonparametric Bayesian methods are no different in this regard, but when the size of the data set gets moderately large, the computational effort required per draw can be enormous as the number of parameters grows with the sample size. Graphics processing units (GPUs) have potential in this area, provided that most of the work can be divided into many parallel tasks which operate on different pieces of memory. By exploiting conditional independence in the model and making use of parallelized algorithms, we demonstrate the feasibility of nonparametric Bayesian modeling in the ``big data" setting of gene expression data.
@@ -24,17 +24,29 @@ Next, we propose to model jointly
 \begin{equation}
 \left(\beta_g^\top,\sigma^2_g\right) \ind \mathcal{P},
 \end{equation}
-where we define
+where we specify a Dirichlet process prior
 
+\begin{equation}
+\mathcal{P} \sim \op{DP}(\alpha Q).
+\end{equation}
+
+This prior, due to \citet{ferguson}, is a distribution over probability distributions, such that for any finite disjoint partition $\{A_i\}_{i>=1}^n$ on $\mathbb{R}^p$, $\mathcal{P}$ is a random measure such that the joint distribution $\left(\mathcal{P}(A_1),\ldots,\mathcal{P}(A_n)\right) \sim \op{Dir}\left(\alpha Q(A_1),\ldots,\alpha Q(A_n)\right).$ The Dirichlet process has two parameters: $Q$, the base measure, represents a prior guess at the distribution. $\alpha$, the concentration parameter expresses the degree to which $\mathcal{P}$ will agree with $Q$ on any set $A$. This follows from the definition given above and known properties of the Dirichlet distribution, i.e., $\op{E}\left(\mathcal{P}(A)\right)=Q(A)$, and $\op{V}\left(\mathcal{P}(A)\right)=\frac{Q(A)(1 - Q(A)}{\alpha + 1}$, showing that $\mathcal{P}(A) \stackrel{p}{\rightarrow} Q(A)$ as $\alpha \rightarrow \infty$ for any set $A$. 
+
+As shown by \citet{sethuraman}, it follows from this definition that $\mathcal{P}$ is almost surely discrete and realizations of $\mathcal{P}$ can be produced by the following stick-breaking construction:
+
+Let 
 \begin{equation}
 \mathcal{P} =\sum_{k=1}^\infty \pi_k \delta_{\left(\tilde{\beta}_k^\top ,\tilde{\sigma}^2_k\right)}.
 \end{equation}
-Here $\delta_{(.)}$ is the Dirac delta function. The ``atoms" of this infinite mixture of degenerate distributions are themselves modeled as random variables with the distribution given by
+Here $\delta_{(.)}$ is the Dirac delta function. The ``atoms" distributed according to $Q$, specified by the product measure
 
 \begin{equation}
-\tilde{\beta}_k \ind \op{N}(\eta, \Lambda),\quad \tilde{\sigma}_k \ind \op{IG}(\gamma, \lambda).
+\tilde{\beta}_k \sim \op{N}(m_\beta, C_\beta),\quad \tilde{\sigma}^2_k \sim \op{IG}(a_{\sigma^2}, b_{\sigma^2}).
 \end{equation}
-The mixture weights, $\pi_k$,  are assumed to follow a stick-breaking process \citep{sethuraman}. Using the reparameterization,
+
+We choose values of $m_\beta,\,C_\beta,\,a_{\sigma^2},\,b_{\sigma^2}$ to put mass on reasonable values of $\left(\beta_g^\top,\sigma^2_g\right)$. This is important for the efficiency of our MCMC algorithm.
+
+The mixture weights, $\pi_k$,  follow a stick-breaking process \cite{sethuraman}. Using the reparameterization,
 
 \begin{equation}
 \nu_k = \frac{\pi_k}{1 - \sum_{l=1}^{k-1} \pi_l},
@@ -45,12 +57,23 @@ $\nu_k$ representing a proportion of the total probability remaining after $k-1$
 \nu_k \ind \op{Beta}(1, \alpha).
 \end{equation}
 
-Note that $\sum_{k=1}^K \pi_k \rightarrow 1$ as $K\rightarrow \infty$. Additionally, this assumption induces a decreasing stochastic ordering of the weights. The parameter $\alpha$ plays an important role in the model, as it controls the rate of decay in these weights. In order to allow the data to lend information about $\alpha$, we assume the following prior on $\alpha$:
+Note that $\sum_{k=1}^K \pi_k \rightarrow 1$ as $K\rightarrow \infty$. Additionally, this assumption induces a decreasing stochastic ordering of the weights. The parameter $\alpha$ plays an important role in the model, since it helps to determine how quickly the successive elements of $\pi$ decay, i.e. the number of clusters selected by the model. For computational convenience, we choose the conditionally conjugate prior
+
 \begin{equation}
-\alpha \sim \op{Gamma}(\Gamma, \Omega).
+\alpha \sim \op{Gamma}(a_\alpha,b_\alpha).
 \end{equation}
 
-The hyperparameters in this model are $\eta, \,\Lambda, \,\gamma, \,\lambda, \,\Gamma$ and $\Omega$. Of these the first four are important with respect to the efficiency of our sampling algorithm. Values leading to a diffuse distribution for the atoms will result in many unrealistic proposals and a slow exploration of the posterior. The last two imply a probable range on the number of relevant atoms/clusters.
+This prior can be selected to express an a priori belief on the number of clusters, $K_{occ}$, in the data. \citet{escobar1994} give expression for the expected value of $K_{occ}$ given $\alpha$ and $G$ as,
+\begin{equation}
+\op{E}(K_{occ})=\sum_{g=1}^{G} \frac{\alpha}{\alpha + g - 1}.
+\end{equation}
+In that paper, the authors use a table of values derived from this formula to defend their proposal for a prior over values of $\alpha$ ranging from $G^{-1}$ to $G^{2}$, which admits values of $\op{E}(K_{occ})$ anywhere from 1 to $G$. Due to computational limitations (we require $K_{occ} \ll G$), and our prior belief, based on scientific evidence, that there are more than just a few clusters, we choose $a_\alpha=3$ and $b_\alpha=\frac{3}{G^{.5}}$ to express a prior that $\op{E}(K_{occ})$ is probably between $G^{.5}$ and $G^{.75}$ (see figure \ref{alphaprior}).
+
+\begin{figure}
+\includegraphics[width=.5\textwidth]{alphaprior}
+\caption{The number of clusters determined by the model is influenced by the parameter $\alpha$, whose value determines the expected number of clusters prior to seeing the data. The figures above demonstrate the prior distribution of the prior expected number of clusters, $\op{E}(K_{occ})$ for datasets with various number of genes, $G$.}
+\label{alphaprior}
+\end{figure}
 
 \subsection{Data augmentation and truncation}
 \label{subsec:reparam}
@@ -195,7 +218,7 @@ thus requiring multinomial sampling.
     \implies p(\nu_k)=\op{Be}(M_k + 1, \sum_{l>k}M_l + \alpha)
   \end{equation*}
 \item[Step 4:]
-  The mass parameter, $\alpha$, has a conjugate gamma prior, and depends only on $\nu$. Its full conditional is:
+  The concentration parameter, $\alpha$, has a conjugate gamma prior, and depends only on $\nu$. Its full conditional is:
 
   \begin{equation}
     p(\alpha|\cdot) \propto \prod_{k=1}^{K-1} \op{Be}(\nu_k;1, \alpha) \; \op{Ga}(\alpha;\Gamma,\Omega)
@@ -220,19 +243,28 @@ element-wise.
 The computational complexity for this step is $O(GKp^2)$. Fortunately, computation of the unnomalized multinomial weights is an embarassingly parallel problem. For numerical stability, these weights are computed on the log scale. From (\ref{zetafull}),
 \begin{equation}
 \label{logweight}
-\log Pr(\zeta_g=k|cdot) = constant + \log \pi_k + -N \log \sigma_k - \frac{1}{2\sigma^2_k}\left(y_g^\top W_g y_g - 2y_g^\top W_g X \beta_k + \beta^\top X^\top W_g X \beta \right).
+\log Pr(\zeta_g=k|\cdot) = constant + \log \pi_k + -N \log \sigma_k - \frac{1}{2\sigma^2_k}\left(y_g^\top W_g y_g - 2y_g^\top W_g X \beta_k + \beta^\top X^\top W_g X \beta \right).
 \end{equation}
 
-In our implementation, first, separate kernels compute a) $y_g^\top W_g X \beta_k$ and b) $\beta^\top X^\top W_g X \beta$. The first can be posed as a matrix multiplcation problem, $B^\top D$, where $\tilde{\beta}_k$ form the columns of $B$, and $X^\top W_g y_g$ form the columns of $D$, which can be resolved using the dgemm routine via the CUBLAS API. The second is accomplished through a call to the use of a custom functor with a call to \code{for\_each}, operating on a \code{zip\_iterator} formed from a \code{tuple} of \code{permutation\_iterator}s which permit random access to the leading positions of the continguous blocks of memory containing $\tilde{\beta}_k$ and $X^\top W_g y_g$. Finally, having reduced the variables to five scalars, (\ref{logweight}) is calculated, again using \code{for\_each} using a \code{zip\_iterator}.
+In our implementation, first, separate kernels compute a) $y_g^\top W_g X \beta_k$ and b) $\beta^\top X^\top W_g X \beta$. The first can be posed as a matrix multiplcation problem, $B^\top D$, where $\tilde{\beta}_k$ form the columns of $B$, and $X^\top W_g y_g$ form the columns of $D$. The second is accomplished using a ``Structure of Arrays" approach (SoA). Here, each thread dereferences an iterator to a tuple of iterators pointing to a $\beta_k$ and a $X^\top W_g X$. The imperative here is to keep the avoid having consecutively indexed threads accessing distant addresses in global memory. Once a) and b) have been computed and stored in global memory, (\ref{logweight}) is computed, again using an AoS approach, coalescing memory accesses by using a tuple of iterators to the five terms in the sum.
 
-To perform the multinomial sampling, we require a cumulative sum of the weights (using log-sum-exp for numerical stability) for each gene. A parallelized routine is implemented by \code{thrust::inclusive\_scan\_by\_key}. Let $S_{g,k}$ denote the $k^{th}$ partial log sum for gene $g$. Next, random uniform variates, $U_g \sim \op{U}(0,1)$ are drawn using the CUBLAS device API, which are transformed using the total log sum, $S_{g,K}$, to $V_g = \log U_g - S_{g,K}$. Using a custom functor, operating on a \code{zip\_iterator} of a \code{tuple} containing iterators to the $V_g$, the cumulative log weights and an integer array with the same dimensions, each partial log sum is compared with the corresponding $V_g$, resulting in zero if $V_g<S_g$ and one otherwise. Finally, the multinomial draw is evaluated using \code{thrust::reduce\_by\_key}, which performs parallel reductions of the indicators, writing these to $\zeta$.
+To perform the categorical sampling of $\zeta$, we first perform a cumulative sum/scan of the weights (using log-sum-exp for numerical stability) for each gene. Define $S_{g,k}$ to be the $k^{th}$ partial log sum for gene $g$. Next, we draw $log U_g$, $U_g \sim \op{U}(0,1)$ add add the respective total log sum, $S_{g,K}$, obtaining $V_g = \log U_g + S_{g,K}$. Next, we have a kernel evaluate the comparison, $S_{g,k}<V_g$, returning $1$ if true and $0$ if false. The resulting $G\times K$ array is then reduced over each value of $g$, the result updating $\zeta$.
 
 \subsubsection{Cluster atoms}
-A prerequisite to drawing from the full conditional distribution for the cluster atoms is to compute cluster summary statistics. We, again, use \code{thrust::reduce\_by\_key} for this. However, this algorithm assumes elements to be reduced are contiguous. Rather than sorting (and copying) the data, only $\zeta$ is sorted, via \code{sort\_by\_key}, which is used to produce a mapping index. Then, \code{reduce\_by\_key} can be called using \code{permutation\_iterator}s instead. For efficiency, these summaries omit unoccupied clusters. The general strategy is to allocate $K$ dimensional blocks of temporary memory to store the parameters for the full conditionals and to then use scattering operations, so that all clusters are updated concurrently. 
-
+A prerequisite to drawing from the full conditional distribution for the cluster atoms is to compute cluster summary statistics. Although this seems fairly straightforward, as it consists mainly to several reductions, this step is not nicely parallelizable as the elements to reduce are not contiguous, the groups being determined by the current value of $\zeta$. Rather than sorting (and copying) the data for each summary, only $\zeta$ is sorted and the resulting permutation is stored. Now, rather than sorting first, a scatter operation can be fused with a reduction that references the sorted $\zeta$ as a key. Note that these cluster summaries omit unoccupied clusters. Since the conditional distribution for cluster $k$ depends on ``updated" prior parameters that represent a combination of the data and the priors, it is convenient to fill a $K$-dimensional parameter vector, do the required computation for the occupied clusters, the scatter it back to the $K$-dimensional vector so that both occupied and unoccupied clusters can be updated at the same time.
 
 \paragraph{Cluster regression coefficients}
-Simulation from the full conditional for $\tilde{\beta}_k$ is accomplished by transforming a standard multivariate normal draw with identity covariance, $Z_k$, and setting $\tilde{\beta}_k = \Lambda^{1\frac{1}{2}} Z_k + \hat{\beta}_k$. Computation of $\hat{\Lambda}_k$ not actually done, rather is the corresponding precision matrix is computed by summing existing summaries  and parameters (\code{for\_each}) and then performing in-place Cholesky decomposition. $\hat{\beta}_k$ is then calculated with solving  $(\hat{\Lambda}_k^{\frac{1}{2}})^2\hat{\beta}_k=X^\top W_g y_g$. We perform this step using two calls to cublasDtrsv in a custom functor, parallelizing across genes, executed with \code{for\_each}.
+Computation of
+$\hat{C}_k^{-1}$, the precision matrix, is calculated, followed
+by in-place Cholesky decomposition. Next, $\hat{m}_k$ is computed
+by solving
+$\hat{C}_k^{-1}\hat{m}_k=\hat{C}_k^{-\frac{1}{2}}\left(\hat{C}_k^{-\frac{1}{2}}\hat{m}_k\right)
+= X^\top W_g y_g$, twice using a routine for solving triangular
+systems of equations. The full conditional draw for $\tilde{\beta}_k$ is
+accomplished by first generating multivariate standard normal draws, $Z_k$, and setting $\tilde{\beta}_k =
+\Lambda^{\frac{1}{2}} Z_k + \hat{\beta}_k$. The scaling operation is
+done by solving a system of equations as before. These
+computations are all parallelized across all clusters, $1,\ldots,K$.
 
 \paragraph{Cluster variance}
 For $\tilde{\sigma}^2_k$, the main hurdle for computation is the computation of $\hat{\lambda}$. This is done in three steps, each parallel over $k$: dot products for $\beta_k^\top \sum_{g:\zeta_g=k}X^\top W_g y_g$, quadratic forms for $\beta_k^\top\left( \sum_{g:\zeta_g=k} X^\top W_g X \right) \beta_k$ and a \code{for\_each} call to combine the terms.
@@ -243,17 +275,133 @@ The second shape parameter can be computed for all $k<K$ using a parallel presca
 
 \subsubsection{Mass parameter}
 
-This work required for this step is trivial.
+Since the full conditional only depends on the value of $K$, $a_\alpha$ and $b_\alpha$, which are constant and the scalar quantity $\pi_K$, this step can be conveniently performed by the CPU. 
+
+\subsection{CUDA libraries}
+There are several libraries that make implementing these algorithms easier in CUDA. Thrust \cite{thrust} extends many concepts from the C++ Standard Template Library to Nvidia GPUs. Included are several useful generic algorithms:
+\begin{itemize}
+\item \code{thrust::for\_each}: This algorithm accepts a void function and an iterator. The serial version increments the iterator, passing each element to the function in turn. The parallel implementation produces the same results, only in thread parallel fashion. The \code{thrust::zip\_iterator} is very useful here, as it iterates over a \code{thrust::tuple} allowing for an AoS approach.
+
+\item \code{thrust::reduce/reduce\_by\_key} As described in section \ref{sec:computation}, Reduce and Scan are defined for any associative binary operators. Reduce by key accepts a key argument and a compatible binary predicate that identifies changes in the key. For example, for the binary predicate \code{x == y}, the key \code{\{1,1,1,2,2,1\}} would have the result be three quantities, the reductions of the first three values, the next two and the last, respectively.
+
+\item \code{thrust::inclusive/exclusive\_scan/scan\_by\_key} 
+
+\end{itemize}
+
+ through a call to the use of a custom functor with a call to \code{for\_each}, operating on a \code{zip\_iterator} formed from a \code{tuple} of \code{permutation\_iterator}s which permit random access to the leading positions of the continguous blocks of memory containing $\tilde{\beta}_k$ and $X^\top W_g y_g$.
+
+CUBLAS \cite{cublas} has implemented BLAS/LAPACK linear algebra
+routines optimized for the GPU. Typically, calls to the CUBLAS
+functions are initiated by the CPU and act on device memory (host
+API). For newer GPUs (compute 3.5 and later), there are routines that
+can be initiated within a kernel (device API). From the host API, our
+algorithm uses \code{cublasDgemm} for multiplying large matrices in
+device memory. From the
+device API, our algorithm uses \code{cublasDtrsv} to solve many small triangular
+systems of equations in parallel.
+
+, which can be resolved using the dgemm routine via the CUBLAS API. 
+\subsection{Multimodality and initialization}
+\label{subsec:initialization}
+An issue with mixture models is multimodality due to non-identifiability of the mixture components. \citet{papas} found that, for the DPMM, although the cluster weights are stochastically ordered, they can still be highly multi-modal. As a remedy, they proposed label-switching moves to improve mixing across indices. Since our interest is in the gene specific parameters, $\beta_g,\sigma^2_g$, rather than the clusters, $\tilde{\beta}_g,\tilde{\sigma}^2_g$, we are not concerned with the multimodality. However, we find empirically that poor initialization will lead to poor mixing, due to an issue related to cluster indexing. In particular, especially when $p$ is moderately large, during the initial stages the $K^{th}$ cluster can become occupied. This leads to large draws for $\alpha$, with the implication that there is no preference in the model for allocation to lower clusters. To remedy this problem, we reorder the cluster indices by their current value of $\pi_k$ after a short initial run, then proceed to subsequent burn-in iterations. Figure \ref{fig:max-id} shows traceplots of a series of Markov chains where reordering has been applied to each. The top frame shows the maximum occupied cluster ID and the bottom frame shows the value of $\alpha$. This example is simulated data with $G=40,000,\, p=6,\, \mbox{and } K=8000$.
+
+\begin{figure}
+\includegraphics[height=.4\textheight]{5-cycles-max-id}
+\includegraphics[height=.4\textheight]{5-cycles-alpha}
+\caption{Traceplots demonstrating high-level behavior after periodic reordering of cluster ids. Top: 5 series, maximum occupied cluster. Bottom: 5 series, $\alpha$.}
+\label{fig:max-id}
+\end{figure}
+
 
 \subsection{Output}
 \label{subsec:output}
-This section will cite Will's computation paper and review how the memory bottleneck doesn't allow for returning all posterior samples. It will describe how and what posterior probabilities and summmary statistics are updated each iteration and the implementation.
+Because of the dimensionality of the problem is large, memory transfer between the CPU and GPU is slow, and memory on the GPU is limited, it is not feasible to save all of the MCMC samples. Following the approach in \citet{landau2016fully}, we preselect a small number of parameters for which we do save each iteration, but for the rest we first determine which functions of those parameters are of interest and use online algorithms that use running sums to update our estimates of those functions. Without this, we would quickly run out of memory on the GPU or lose a great deal of time due to copying substantial amounts of data each MCMC iteration. The class of estimates we calculate fall into two categories,
+\begin{enumerate}
+\item expectations of the gene-specific parameters and their squares, i.e. $\op{E} \beta_g,\, \op{E} \beta_g^2,\, \op{E}\sigma_g,\, \op{E}\sigma_g^2$ and 
+\item gene-specific posterior probabilities of conjunctions of linear inequalities of the elements of $\beta_g$, i.e., $\op{Pr}\left(c_1\beta_g > 0 \land \ldots \land c_t\beta_g\right)$.
+\end{enumerate}
+Updates of these quantities are embarrasingly parallel across $g$, so are well suited to the GPU. The update in 1) is done elementwise, based on a running sum, and the update in 2) can be decomposed into four tasks, a matrix multiplication to compute $C\beta$, an elementwise evaluation of the sign of the value, a parallel setwise reduction using the minimum to evaluate each conjunction, and finally an update of the estimator (using the same functionality as 1)).
 
-\section{Timing analysis}
-This section will present a study using the number of effective samples per unit time for the hyperparameter, $\alpha$, for simulated data sets of various sizes.
+\section{Simulation Study}
+The time required by our method will depend both on the raw computational effort, as well as the efficiency of the algorithm. For this reason we choose to use the time per effective sample, which incorporates both of these factors. In particular, we focus on $\alpha$ for simplicity and because it tends to reflect changes in the overall behavior of the Gibbs sampler.
+
+For our experiment, we considered three factors: $G$, the number of genes, $p$, the dimension of $\beta_g$, and $K$, the truncation limit. For each combination of the levels of these three factors we simulated data as follows:
+
+\begin{enumerate}
+  \item Let $K_{occ} = \op{floor}(G^{0.5})$. For $k=1 \ldots K_{occ}$, draw $\tilde{\beta}_k \sim \op{N}(0, C),\; \tilde{\sigma^2}_k \sim \op{IG}(1, 1)$, where $C=\op{diag}(3, 3/2^2, \ldots, 3/p^2)$.
+  
+  \item For $g=1,\ldots G$, draw $\zeta_g \sim \op{Cat}(1/K_{occ},\ldots,1/K_{occ})$. 
+  
+  \item Let $X = \begin{pmatrix} 1_{4 \times 1} & 0_{1\times(p-1)}\\
+                                 1_{4(p-1) \times 1} & I_{(p-1)\times(p-1)} \end{pmatrix}$. Draw $y_{g} \sim \op{N}(X\tilde{\beta}_{\zeta_g}, \tilde{\sigma}^2_{\zeta_g}).$
+\end{enumerate}
+
+
+In this experiment we set $m_\beta = m,\, C_\beta = C,\, a_\sigma^2=1,\, b_\sigma^2=1$, matching the true values, and we set the prior for $\alpha$ as described in section \ref{sec:model}.
+
+Figure \ref{sec-per-mcmc} shows the time per MCMC iteration for each simulation. It appears that the time required grows sublinearly in $G$ and linearly in $K$. We should note that the sample size, $N$, itself has no impact, because the sufficient summary statistics do not scale with $N$.
+
+\section{Example: Paschold maize data}
+\citet{paschold} produced an RNA-seq data set for gene expression of root tissue from samples, one sample from each of four young plants representing each of four maize genotypes. The genotypes were two recombinant inbred varieties, B73 and Mo17 and two crosses, B73$\times$Mo17 and Mo17$\times$B73. The plants were at an early stage where phenotypical differences between the genotypes were not yet displayed. A potentially interesting feature that RNA-seq can help address is which genes demonstrate evidence of a difference in expression between two genotypes. At present, we will consider B73 and B73$\times$Mo17.
+
+\subsection{Comparison of methods}
+In addition to our method, we also fit the data using two other model: a linear mixed-effects model, treating gene-specific parameters as random effects, and all genes independently using least squares. For every method we parameterized the gene-specific mean by an intercept term and a half-difference term -- $\frac{1}{2}(\mbox{B73}\times\mbox{Mo17}-\mbox{B73})$. The independence model, which produces a gene-specific variance estimate borrows no information across genes. The linear mixed-effects model assumes a bivariate normal distribution for all the gene-specific mean parameters. Because the covariance and the mean of this distribution is estimatated from the data, this model does borrow information across genes (since software assumes a zero mean for the random gene effects, we also estimate a fixed effect which corresponds to the unknown mean.) This method assumes homogeneity of the error variance across genes.
+
+\begin{figure}
+\includegraphics[width=.7\textwidth]{lmm_v_ols.pdf}
+\caption{Comparisons of the parameter estimates under each method.}
+\label{lmm_v_ols}
+\end{figure}
+Figure \ref{lmm_v_ols} shows a comparison of the estimates under these two models. While there is agreement about the gene-specific intercepts in the two models, there is noticable shrinkage toward the global mean for the half-difference in the linear mixed-effects model. This can be explained by the long tail of these estimates relative to a normal distribution.
+
+\begin{figure}
+\includegraphics[width=.9\textwidth]{type_v_pairs}
+\caption{Bivariate histograms and violin plots describing the joint distribution of estimates obtained from all methods}
+\label{type_v_pairs}
+\end{figure}
+
+Plotting pairs of parameter estimates obtained from the different methods shows slight differences in the joint distribution of the gene-specific mean parameters for OLS when compared with those obtained by LMM. The most notable difference between the two models being the homogenous variance assumption of LMM. As suggested here, there is a decreasing trend toward lower variability, as a proportion of the mean, as the mean expression increases.
+
+
+\ref{type_v_pairs}  
+
+
+
+
+Of particular interest was the identification of genes where the mean hybrid expression is higher or lower than that of both parents. For each gene, a reduced version of the design matrix (collapsing identical rows) is
+\begin{equation*}
+\begin{blockarray}{lcccc}
+  & \beta_1 & \beta_2 & \beta_3 & \beta_4\\
+  \begin{block}{l(cccc)}
+  \mbox{B73} & 1 & 1 & 0 & 0\\
+  \mbox{Mo17} & 1 & -1 & 0 & 0\\
+  \mbox{B73$\times$Mo17} & 1 & 0 & 1 & 1\\
+  \mbox{Mo17$\times$B73} & 1 & 0 & 1 & -1\\
+  \end{block}
+\end{blockarray}
+\label{design}
+\end{equation*}
+
+In figure \ref{ggpairs_us}, histograms of the empirical distributions of the OLS estimates are shown. The irregularities seen here contraindicate the use of simple independent parametric models for the underlying parameters. In particular, we note the multimodality of $\beta_1$, the rotated `V' shape of $(\beta_2,\beta_3)$. Despite a large number of genes, we suspect that a misspecification of the model for these parameters will limit the efficacy of borrowing information across genes. We seek to improve the efficacy of borrowing information by relaxing the model to allow Bayesian learning about the underlying distribution of these parameters.
+\begin{figure}
+\includegraphics[width=\textwidth]{ggpairs_us}
+\caption{Histograms and pairwise histograms of independent OLS
+  estimates to for $(\beta_g,\log \sigma_g)$ for all genes in Paschold data set with a non-zero count.}
+\label{ggpairs_us}
+\end{figure}
+
+Estimates of the posterior means after fitting our model are shown in figure \ref{ggpairs_s}.
+\begin{figure}
+\includegraphics[width=\textwidth]{ggpairs_s}
+\caption{Histograms and pairwise histograms of posterior means of
+  nonparametric model. Relative to the estimates in Figure
+  \ref{ggpairs_us}, there is substantial shrinkage acheived by latent
+  clustering.}
+\label{ggpairs_s}
+\end{figure}
 
 \section{Discussion}
-Summarise the contribution of this paper. Here we might also discuss possible changes to the sampling model and the associated implications.
+Summarise the contribution of this paper. May want to discuss possible extensions, such as changing the data model, adding label-switching moves, etc.
 
 
 
