@@ -158,14 +158,12 @@ a[n] \GETS 0\\
 If $P$ processors are available
 the time required to scan $n$ elements is on the order $O(n/P + \log_2P)$, versus $O(n)$ for the serial algorithm. This is the same as the parallel reduction.
 % Parallel scans are implemented in Thrust, called with \code{inclusive\_scan} for a full scan and \code{exclusive\_scan} for a prescan.
-
-\subsubsection{Pseudo-random number generation}
-Schemes for pseudo-random number generation (PRNG) in parallel have been developed. Since PRNGs are deterministic and sequential, a natural parallel adaptation is access the same sequence at locations distant enough to avoid overlap or to use a strided access pattern.
+%\subsubsection{Pseudo-random number generation}
 
 % Parallel uniform and normal random number generation. For the (inverse) gamma draws, the method of \citet{simplegamma} is used, pairs of which can be transformed to produce beta draws.
 
-\subsubsection{Linear algebra}
-For computationally intensive tasks, such as matrix multiplication, much of the work can be done independently. Because much of the work requires repeated use of the same data, however, the optimal solution depends on both the hardware and the size of the problem. Fortunately, much of this work has already been done. Just as is the case in plain C, it is recommended to use APIs to optimized, documented libraries which are being developed and made available for GPUs.
+%\subsubsection{Linear algebra}
+%For computationally intensive tasks, such as matrix multiplication, much of the work can be done independently. Because much of the work requires repeated use of the same data, however, the optimal solution depends on both the hardware and the size of the problem. Fortunately, much of this work has already been done. Just as is the case in plain C, it is recommended to use APIs to optimized, documented libraries which are being developed and made available for GPUs.
 % Many LAPACK/BLAS routines, including matrix multiplication, solving lower triangular matrix equations, matrix-vector multiplication and dot product.
 
 
@@ -188,28 +186,33 @@ thus requiring multinomial sampling.
   \begin{enumerate}
   \item[(a)] The full conditional for cluster location, $\tilde{\beta}_k$:
     \begin{equation}
-      p(\tilde{\beta}_k|\cdot) \propto \prod_{g:\zeta_g=k} \op{N}(y_g;\,X\tilde{\beta}_k, \sigma^2_gW^{-1}_g)\,\op{N}(\tilde{\beta}_k; \eta, \Lambda)
+      p(\tilde{\beta}_k|\cdot) \propto \prod_{g:\zeta_g=k} \op{N}(y_g;\,X\tilde{\beta}_k, \sigma^2_gW^{-1}_g)\,\op{N}(\tilde{\beta}_k; m, C)
     \end{equation}
     \begin{equation*}
-      \implies p(\tilde{\beta}_k|\cdot) = \op{N}(\tilde{\beta}_k; \hat{\beta}_k,\, \hat{\Lambda}_k),
+      \implies p(\tilde{\beta}_k|\cdot) = \op{N}(\tilde{\beta}_k; \hat{m}_k,\, \hat{C}_k),
     \end{equation*}
     \begin{equation*}
-    \mbox{ where }\hat{\Lambda}_k= \left( \sigma^{-2}_g\sum_{g:\zeta_g=k} X^\top W_g X + \Lambda^{-1} \right)^{-1}, \mbox{ and }\hat{\beta}_k=\hat{\Lambda}_k \sum_{g:\zeta_g=k} X^\top W_g y_g
+    \mbox{ where }\hat{C}_k= \left( \sigma^{-2}_g\sum_{g:\zeta_g=k}
+      X^\top W_g X + C^{-1} \right)^{-1}, \mbox{ and
+    }\hat{m}_k=\hat{C}_k \left(\sum_{g:\zeta_g=k} X^\top W_g y_g +
+      C^{-1}m \right).
     \end{equation*}
   \item[(b)] The full conditional for cluster variance, $\tilde{\sigma}_k^2$, is:
     \begin{equation}
-      p(\tilde{\sigma}_k^2|\cdot) \propto \prod_{g:\zeta_g=k} \op{N}(y_g;\,X\tilde{\beta}_k, \sigma^2_gW^{-1}_g) \op{IG}(\tilde{\sigma}_k^2; \gamma, \lambda)
+      p(\tilde{\sigma}_k^2|\cdot) \propto \prod_{g:\zeta_g=k}
+      \op{N}(y_g;\,X\tilde{\beta}_k, \sigma^2_gW^{-1}_g)
+      \op{IG}(\tilde{\sigma}_k^2; a_{\sigma^2},b_{\sigma^2})
     \end{equation}
     \begin{equation*}
-      \implies p(\tilde{\sigma}_k^2|\cdot) = \op{IG}(\hat{\gamma}_k,\hat{\lambda}_k), 
+      \implies p(\tilde{\sigma}_k^2|\cdot) = \op{IG}(\hat{a}_k,\hat{b}_k), 
     \end{equation*}
     \begin{equation*}
-      \mbox{ where }\hat{\gamma}_k = \gamma + \frac{NM_k}{2},\mbox{ and }\hat{\lambda}_k= \lambda + \sum_{g:\zeta_g=k}y_g^\top W_g y_g -2 \beta_g^\top X^\top W_g y_g  +\beta_g^\top X^\top W_g X \beta_g
+      \mbox{ where }\hat{a}_k = a_{\sigma^2} + \frac{NM_k}{2},\mbox{ and }\hat{b}_k= b_{\sigma^2} + \sum_{g:\zeta_g=k}y_g^\top W_g y_g -2 \beta_g^\top X^\top W_g y_g  +\beta_g^\top X^\top W_g X \beta_g
     \end{equation*}
 
     Here $M_k$ is the number of $g$ for which $\zeta_g = k$. 
   \end{enumerate}
-\item[Step 3:] The full conditional for $\nu_k$ depends only on $M_k(\zeta)$. The full conditional is:
+\item[Step 3:] The full conditional for $\nu_k,\,k=1,\ldots,K-1$ depends only on $M_k(\zeta)$. The full conditional is:
 
   \begin{equation}
     p(\nu_k) \propto \prod_{l \ge k} \prod_{g:\zeta_g=k} \pi_k \; \op{Be}(\nu_k; 1, \alpha) \propto \nu_k^{M_k + 1}(1-\nu_k)^{\sum_{l > k} M_l + \alpha} 
@@ -221,14 +224,14 @@ thus requiring multinomial sampling.
   The concentration parameter, $\alpha$, has a conjugate gamma prior, and depends only on $\nu$. Its full conditional is:
 
   \begin{equation}
-    p(\alpha|\cdot) \propto \prod_{k=1}^{K-1} \op{Be}(\nu_k;1, \alpha) \; \op{Ga}(\alpha;\Gamma,\Omega)
+    p(\alpha|\cdot) \propto \prod_{k=1}^{K-1} \op{Be}(\nu_k;1, \alpha) \; \op{Ga}(\alpha;a_\alpha,b_\alpha)
 \propto \alpha^{(K-1) + \Gamma - 1} \left(\prod_{k=1}^{K-1} (1-\nu_k)\right)^\alpha e^{-\Omega \alpha} 
   \end{equation}
   \begin{equation*}
-    = \alpha^{(K-1) + \Gamma - 1} e^{-(-\log \pi_K + \Omega) \alpha}
+    = \alpha^{(K-1) + a_\alpha - 1} e^{-(-\log \pi_K + b_\alpha) \alpha}
   \end{equation*}
   \begin{equation*}
-    \implies p(\alpha|\cdot) = \op{Ga}(K + \Gamma - 1, -\log \pi_K + \Omega)
+    \implies p(\alpha|\cdot) = \op{Ga}(K + a_\alpha - 1, -\log \pi_K + b_\alpha)
   \end{equation*}
 \end{enumerate}
 
@@ -267,30 +270,51 @@ done by solving a system of equations as before. These
 computations are all parallelized across all clusters, $1,\ldots,K$.
 
 \paragraph{Cluster variance}
-For $\tilde{\sigma}^2_k$, the main hurdle for computation is the computation of $\hat{\lambda}$. This is done in three steps, each parallel over $k$: dot products for $\beta_k^\top \sum_{g:\zeta_g=k}X^\top W_g y_g$, quadratic forms for $\beta_k^\top\left( \sum_{g:\zeta_g=k} X^\top W_g X \right) \beta_k$ and a \code{for\_each} call to combine the terms.
+For $\tilde{\sigma}^2_k$, the main hurdle is the computation of
+$\hat{}$. This is done in three steps, each parallel over $k$, using
+the AoS approach discussed in the beginning of this subsection. First,
+dot products for $\beta_k^\top \sum_{g:\zeta_g=k}X^\top W_g y_g$;
+second, quadratic forms for $\beta_k^\top\left( \sum_{g:\zeta_g=k}
+  X^\top W_g X \right) \beta_k$ and lastly, parallel summation of
+these with $\sum_{g:\zeta_g=k}y_g^\top y_g.$
 
 \subsubsection{Cluster weights}
 
-The second shape parameter can be computed for all $k<K$ using a parallel prescan (in reverse) on the $M_k$, which are defined in the previous subsection. The addition of $\alpha$ is done using the convenient \code{thrust::transform}.
+The conjugate beta draws for $\nu_k$ each require two parameters. The
+first shape parameters are computed by parallel elementwise addition;
+the second can be computed using a parallel scan, in reverse order, of $M_k$.
 
 \subsubsection{Mass parameter}
 
-Since the full conditional only depends on the value of $K$, $a_\alpha$ and $b_\alpha$, which are constant and the scalar quantity $\pi_K$, this step can be conveniently performed by the CPU. 
+The scalar parameter $\alpha$ depends only on the constants $K$, $a_\alpha$ and $b_\alpha$, and the scalar quantity $\pi_K$. This step can be conveniently performed by the CPU.
 
 \subsection{CUDA libraries}
 There are several libraries that make implementing these algorithms easier in CUDA. Thrust \cite{thrust} extends many concepts from the C++ Standard Template Library to Nvidia GPUs. Included are several useful generic algorithms:
 \begin{itemize}
-\item \code{thrust::for\_each}: This algorithm accepts a void function and an iterator. The serial version increments the iterator, passing each element to the function in turn. The parallel implementation produces the same results, only in thread parallel fashion. The \code{thrust::zip\_iterator} is very useful here, as it iterates over a \code{thrust::tuple} allowing for an AoS approach.
+\item \code{thrust::for\_each}: This algorithm accepts a functor (an
+  instance of a class with a member \code{operator()} function)
+  and an iterator. The serial version increments the iterator, passing
+  each element to the \code{operator()} in turn. The parallel implementation
+  produces the same results, only in thread parallel fashion. The
+  \code{thrust::zip\_iterator} is very useful, as it can be used
+  to iterate
+  over a \code{thrust::tuple}. This approach is very general, allowing
+  for operations involving up to ten variables using an AoS
+  design.
 
-\item \code{thrust::reduce/reduce\_by\_key} As described in section \ref{sec:computation}, Reduce and Scan are defined for any associative binary operators. Reduce by key accepts a key argument and a compatible binary predicate that identifies changes in the key. For example, for the binary predicate \code{x == y}, the key \code{\{1,1,1,2,2,1\}} would have the result be three quantities, the reductions of the first three values, the next two and the last, respectively.
+\item \code{thrust::reduce/reduce\_by\_key}: As described in section
+  \ref{sec:computation}, both reduce and scan are defined for any associative binary operators. Reduce by key accepts a key argument and a compatible binary predicate that identifies changes in the key. For example, for the binary predicate \code{x == y}, the key \code{\{1,1,1,2,2,1\}} would have the result be three quantities, the reductions of the first three values, the next two and the last, respectively.
 
-\item \code{thrust::inclusive/exclusive\_scan/scan\_by\_key} 
-
+\item \code{thrust::inclusive/exclusive\_scan/scan\_by\_key}: Thrust
+  offers multiple versions of the scan algorithm. The ``exclusive''
+  version is a prescan, where the first element in the result is
+  always the identity element, and the ``inclusive'' version is a full
+  scan, with the last element being equal to the result of a reduction
+  of the elements in the vector.
 \end{itemize}
 
- through a call to the use of a custom functor with a call to \code{for\_each}, operating on a \code{zip\_iterator} formed from a \code{tuple} of \code{permutation\_iterator}s which permit random access to the leading positions of the continguous blocks of memory containing $\tilde{\beta}_k$ and $X^\top W_g y_g$.
-
-CUBLAS \cite{cublas} has implemented BLAS/LAPACK linear algebra
+For linear algebra on the GPU, standard installations of CUDA also
+include CUBLAS \cite{cublas}. CUBLAS has implementions of BLAS/LAPACK
 routines optimized for the GPU. Typically, calls to the CUBLAS
 functions are initiated by the CPU and act on device memory (host
 API). For newer GPUs (compute 3.5 and later), there are routines that
@@ -300,10 +324,34 @@ device memory. From the
 device API, our algorithm uses \code{cublasDtrsv} to solve many small triangular
 systems of equations in parallel.
 
-, which can be resolved using the dgemm routine via the CUBLAS API. 
+Schemes for parallel pseudo-random number generation (PRNG) have been
+developed for CUDA. Since PRNGs are deterministic and sequential, a
+natural parallel adaptation is access the same sequence at locations
+distant enough to avoid overlap or to use a strided access
+pattern. CURAND \cite{curand}, provides such functionality for generating
+normal and uniform random numbers on the GPU. For other distributions,
+such as gamma,
+one can write a custom kernel, making use of CURAND as a source of
+randomness, for threaded sampler.
+
 \subsection{Multimodality and initialization}
 \label{subsec:initialization}
-An issue with mixture models is multimodality due to non-identifiability of the mixture components. \citet{papas} found that, for the DPMM, although the cluster weights are stochastically ordered, they can still be highly multi-modal. As a remedy, they proposed label-switching moves to improve mixing across indices. Since our interest is in the gene specific parameters, $\beta_g,\sigma^2_g$, rather than the clusters, $\tilde{\beta}_g,\tilde{\sigma}^2_g$, we are not concerned with the multimodality. However, we find empirically that poor initialization will lead to poor mixing, due to an issue related to cluster indexing. In particular, especially when $p$ is moderately large, during the initial stages the $K^{th}$ cluster can become occupied. This leads to large draws for $\alpha$, with the implication that there is no preference in the model for allocation to lower clusters. To remedy this problem, we reorder the cluster indices by their current value of $\pi_k$ after a short initial run, then proceed to subsequent burn-in iterations. Figure \ref{fig:max-id} shows traceplots of a series of Markov chains where reordering has been applied to each. The top frame shows the maximum occupied cluster ID and the bottom frame shows the value of $\alpha$. This example is simulated data with $G=40,000,\, p=6,\, \mbox{and } K=8000$.
+\citet{papas} identified an issue with conditional samplers for DP
+mixture models that rely on the stick-breaking construction. They
+noted that, although the cluster weights are stochastically
+ordered, the ordering of cluster labels is only weakly identifiable,
+so that the posterior distributions for the weight at any given index
+is multi-modal. This is due to many configurations of the allocation
+parameters being nearly equivalent in the posterior. 
+
+We find empirically that, because of this weakness, poor initialization can
+lead to very slow mixing of $\alpha$, whereby a cluster, $k$, with a large
+index becomes occupied, leading to a high draw for $\alpha$, which
+increases subsequent draws for $\pi_k$, and so forth. In particular,
+especially when $p$ is moderately large, during the initial stages the
+$K^{th}$ cluster can become occupied. This leads to very large draws
+for $\alpha$, which can greatly decrease the quality of the truncation
+approximation. To avoid this problem, we reorder the cluster indices by their current value of $\pi_k$ after a short initial run, then proceed to subsequent burn-in iterations. Figure \ref{fig:max-id} shows traceplots of a series of Markov chains where reordering has been applied to each. The top frame shows the maximum occupied cluster ID and the bottom frame shows the value of $\alpha$. This example is simulated data with $G=40,000,\, p=6,\, \mbox{and } K=8000$.
 
 \begin{figure}
 \includegraphics[height=.4\textheight]{5-cycles-max-id}
@@ -318,7 +366,9 @@ An issue with mixture models is multimodality due to non-identifiability of the 
 Because of the dimensionality of the problem is large, memory transfer between the CPU and GPU is slow, and memory on the GPU is limited, it is not feasible to save all of the MCMC samples. Following the approach in \citet{landau2016fully}, we preselect a small number of parameters for which we do save each iteration, but for the rest we first determine which functions of those parameters are of interest and use online algorithms that use running sums to update our estimates of those functions. Without this, we would quickly run out of memory on the GPU or lose a great deal of time due to copying substantial amounts of data each MCMC iteration. The class of estimates we calculate fall into two categories,
 \begin{enumerate}
 \item expectations of the gene-specific parameters and their squares, i.e. $\op{E} \beta_g,\, \op{E} \beta_g^2,\, \op{E}\sigma_g,\, \op{E}\sigma_g^2$ and 
-\item gene-specific posterior probabilities of conjunctions of linear inequalities of the elements of $\beta_g$, i.e., $\op{Pr}\left(c_1\beta_g > 0 \land \ldots \land c_t\beta_g\right)$.
+\item gene-specific posterior probabilities of conjunctions of linear
+  inequalities of the elements of $\beta_g$, i.e.,
+  $\op{Pr}\left(c_1\beta_g > 0 \land \ldots \land c_t\beta_g > 0\right)$.
 \end{enumerate}
 Updates of these quantities are embarrasingly parallel across $g$, so are well suited to the GPU. The update in 1) is done elementwise, based on a running sum, and the update in 2) can be decomposed into four tasks, a matrix multiplication to compute $C\beta$, an elementwise evaluation of the sign of the value, a parallel setwise reduction using the minimum to evaluate each conjunction, and finally an update of the estimator (using the same functionality as 1)).
 
