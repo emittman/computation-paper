@@ -14,7 +14,7 @@ priors <- formatPriors(K=4000, estimates = est, A=3, B=3/sqrt(dat$G))
 
 C <- list(diff_expr = matrix(c(0, 1),1,2, byrow=T)) 
 
-contr <- formatControl(n_iter = 1,
+contr <- formatControl(n_iter = 5,
                        thin = 5,
                        warmup = 1000,
                        methodPi = "stickBreaking",
