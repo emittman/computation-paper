@@ -25,7 +25,7 @@ contr <- formatControl(n_iter = 5,
 #run a pilot chain and reorder clusters
 start.chain <- initFixedGrid(priors, est)
 init.run <- mcmc(dat, priors, contr, start.chain, C, est)
-saveRDS(start.chain, "start.chain.rds")
+saveRDS(init.run, "init-run.rds")
 id <- order(init.run[['state']]$pi, decreasing=TRUE)
 init.chain <- with(init.run[['state']], formatChain(beta[,id], exp(pi[id]), tau2[id], start.chain$zeta, alpha))
 contr$n_iter <- 100000
