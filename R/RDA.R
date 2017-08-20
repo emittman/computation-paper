@@ -1,7 +1,6 @@
 library(cudarpackage)
 library(dplyr)
 set.seed(1001001001)
-y <- readRDS("filtered_counts.rds")
 
 load("diff_expr.Rdata")
 dat <- readRDS("data/cuda-data.rds")
