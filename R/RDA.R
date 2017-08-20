@@ -10,7 +10,7 @@ X <- matrix(c(1,  -1,
               1,   1),byrow=T,2,2)
 
 
-priors <- formatPriors(K=4000, estimates = estimates, A=3, B=3/sqrt(dat$G))
+priors <- formatPriors(K=4000, estimates = est, A=3, B=3/sqrt(dat$G))
 
 C <- list(diff_expr = matrix(c(0, 1),1,2, byrow=T)) 
 
