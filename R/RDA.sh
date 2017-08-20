@@ -11,5 +11,7 @@
 #SBATCH --mail-type=FAIL
 
 module load R
+module load cuda
 
+cd /home/emittman/computation-paper/R/
 R CMD BATCH --vanilla --no-save RDA.R #run an R script using R
