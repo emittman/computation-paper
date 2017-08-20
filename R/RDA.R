@@ -16,7 +16,7 @@ C <- list(diff_expr = matrix(c(0, 1),1,2, byrow=T))
 
 contr <- formatControl(n_iter = 5,
                        thin = 5,
-                       warmup = 5,
+                       warmup = 50,
                        methodPi = "stickBreaking",
                        idx_save = 1,
                        n_save_P = 1,
@@ -25,8 +25,9 @@ contr <- formatControl(n_iter = 5,
 #run a pilot chain and reorder clusters
 start.chain <- initFixedGrid(priors, est)
 init.run <- mcmc(dat, priors, contr, start.chain, C, est)
+saveRDS(start.chain, "start.chain.rds")
 id <- order(init.run[['state']]$pi, decreasing=TRUE)
-init.chain <- with(init.run[['state']], formatChain(beta[,id], exp(pi[id]), tau2[id], zeta, alpha))
+init.chain <- with(init.run[['state']], formatChain(beta[,id], exp(pi[id]), tau2[id], start.chain$zeta, alpha))
 contr$n_iter <- 100000
 contr$warmup <- 10000
 contr$idx_save <- sample(dat$G, 10)
