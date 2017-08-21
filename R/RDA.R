@@ -2,7 +2,7 @@ library(cudarpackage)
 library(dplyr)
 set.seed(1001001001)
 
-load("data/cuda_dat.RData")
+load("data/cuda_dat.Rdata")
 load("data/ind_est.RData")
 
 
