@@ -2,17 +2,13 @@ library(cudarpackage)
 library(dplyr)
 set.seed(1001001001)
 
-load("diff_expr.Rdata")
-dat <- readRDS("data/cuda-data.rds")
-est <- readRDS("data/est.rds")
-
-X <- matrix(c(1,  -1,
-              1,   1),byrow=T,2,2)
+load("data/cuda_dat.RData")
+load("data/ind_est.RData")
 
 
-priors <- formatPriors(K=4000, estimates = est, A=3, B=3/sqrt(dat$G))
+priors <- formatPriors(K=4000, estimates = ind_est, A=3, B=3/sqrt(cuda_dat$G))
 
-C <- list(diff_expr = matrix(c(0, 1),1,2, byrow=T)) 
+C <- list(diff_expr = matrix(c(0, 1, 0),1,3, byrow=T)) 
 
 contr <- formatControl(n_iter = 5,
                        thin = 5,
@@ -23,19 +19,19 @@ contr <- formatControl(n_iter = 5,
                        alpha_fixed = FALSE)
 
 #run a pilot chain and reorder clusters
-start.chain <- initFixedGrid(priors, est)
-init.run <- mcmc(dat, priors, contr, start.chain, C, est)
+start.chain <- initFixedGrid(priors, ind_est)
+init.run <- mcmc(cuda_dat, priors, contr, start.chain, C, ind_est)
 saveRDS(init.run, "init-run.rds")
 id <- order(init.run[['state']]$pi, decreasing=TRUE)
 init.chain <- with(init.run[['state']], formatChain(beta[,id], exp(pi[id]), tau2[id], start.chain$zeta, alpha))
-contr$n_iter <- 100000
-contr$warmup <- 10000
-contr$idx_save <- sample(dat$G, 10)
-contr$n_save_P <- 100
+contr$n_iter <- as.integer(50000)
+contr$warmup <- as.integer(1000)
+contr$idx_save <- sample(cuda_dat$G, 10)
+contr$n_save_P <- as.integer(100)
 
-sb <- mcmc(dat, priors, contr, init.chain, C, est)
+sb <- mcmc(cuda_dat, priors, contr, init.chain, C, ind_est)
 saveRDS(sb, file="RDA-SB.rds")
 
 contr$methodPi <- "symmDirichlet"
-sd <- mcmc(dat, priors, contr, C=C, estimates=est)
-saveRDS(s, "RDA-SB.rds")
+sd <- mcmc(cuda_dat, priors, contr, C=C, estimates=ind_est)
+saveRDS(s, "RDA-SD.rds")
