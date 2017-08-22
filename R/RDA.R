@@ -19,20 +19,26 @@ contr <- formatControl(n_iter = 2,
                        alpha_fixed = FALSE)
 
 #run a pilot chain and reorder clusters
-start.chain <- initFixedGrid(priors, ind_est)
-init.run <- mcmc(cuda_dat, priors, contr, start.chain, C, ind_est)
+start.chain <- initFixedGrid(priors = priors, estimates = ind_est, C = C)
+init.run <- mcmc(cuda_dat, priors, contr, start.chain)
 saveRDS(init.run, "init-run.rds")
 id <- order(init.run[['state']]$pi, decreasing=TRUE)
-init.chain <- with(init.run[['state']], formatChain(beta[,id], exp(pi[id]), tau2[id], start.chain$zeta, alpha))
+init.chain <- with(init.run[['state']], 
+                   formatChain(beta = beta[,id],
+                               pi = exp(pi[id]),
+                               tau2 = tau2[id],
+                               zeta =  start.chain$zeta,
+                               alpha = alpha,
+                               C = C))
 contr$n_iter <- as.integer(50000)
 contr$thin <- as.integer(5)
 contr$warmup <- as.integer(10000)
-contr$idx_save <- sample(cuda_dat$G, 10)
+contr$idx_save <- 0:9
 contr$n_save_P <- as.integer(100)
 
-sb <- mcmc(cuda_dat, priors, contr, init.chain, C, ind_est)
+sb <- mcmc(cuda_dat, priors, contr, init.chain)
 saveRDS(sb, file="RDA-SD.rds")
 
 contr$methodPi <- "stickBreaking"
-sd <- mcmc(cuda_dat, priors, contr, C=C, estimates=ind_est)
+sd <- mcmc(cuda_dat, priors, contr, init.chain)
 saveRDS(s, "RDA-SB.rds")
