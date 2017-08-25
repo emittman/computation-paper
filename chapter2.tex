@@ -389,7 +389,8 @@ For our experiment, we considered three factors: $G$, the number of genes, $p$, 
 
 In this experiment we set $m_\beta = m,\, C_\beta = C,\, a_\sigma^2=1,\, b_\sigma^2=1$, matching the true values, and we set the prior for $\alpha$ as described in section \ref{sec:model}.
 
-Figure \ref{sec-per-mcmc} shows the time per MCMC iteration for each simulation. It appears that the time required grows sublinearly in $G$ and linearly in $K$. We should note that the sample size, $N$, itself has no impact, because the sufficient summary statistics do not scale with $N$.
+
+Time per MCMC iteration in seconds for each simulation. It appears that the time required grows sublinearly in $G$ and linearly in $K$. We should note that the sample size, $N$, itself has no impact, because the sufficient summary statistics do not scale with $N$.
 
 \section{Example: Paschold maize data}
 \citet{paschold} produced an RNA-seq data set for gene expression of root tissue from samples, one sample from each of four young plants representing each of four maize genotypes. The genotypes were two recombinant inbred varieties, B73 and Mo17 and two crosses, B73$\times$Mo17 and Mo17$\times$B73. The plants were at an early stage where phenotypical differences between the genotypes were not yet displayed. A potentially interesting feature that RNA-seq can help address is which genes demonstrate evidence of a difference in expression between two genotypes. At present, we will consider B73 and B73$\times$Mo17.

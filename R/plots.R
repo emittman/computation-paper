@@ -99,22 +99,23 @@ col1xlim <- ggplot_build(q11)$layout$panel_ranges[[1]]$x.range
 col1ylim <- ggplot_build(q11)$layout$panel_ranges[[1]]$y.range
 
 
-q12 <- ggplot(plot_df_ws, aes(x=intercept, y=log_sigma)) + geom_hex() +
+q12 <- filter(plot_df3, type=="ols") %>%
+  ggplot(aes(x=intercept, y=flow_cell)) + geom_hex() +
   scale_fill_continuous(trans="log", breaks=c(1, 10, 100, 1000), low="white", high="darkblue")+
   my_theme
 
-col2xlim <- ggplot_build(q12)$layout$panel_ranges[[1]]$x.range + c(-1,1)
-col2ylim <- ggplot_build(q12)$layout$panel_ranges[[1]]$y.range + c(-2,0)
-q12 <- q12 + ylim(col2ylim) + xlim(col2xlim)
+col2xlim <- ggplot_build(q12)$layout$panel_ranges[[1]]$x.range
+col2ylim <- ggplot_build(q12)$layout$panel_ranges[[1]]$y.range
 
 
-q13 <- ggplot(plot_df_ws, aes(x=halfdiff, y=log_sigma)) + geom_hex() +
+q13 <- filter(plot_df3, type=="ols") %>%
+  ggplot(aes(x=halfdiff, y=flow_cell)) + geom_hex() +
   scale_fill_continuous(trans="log", breaks=c(1, 10, 100, 1000), low="white", high="darkblue")+
   my_theme
 
-col3xlim <- ggplot_build(q13)$layout$panel_ranges[[1]]$x.range + c(-1,1)
-col3ylim <- ggplot_build(q13)$layout$panel_ranges[[1]]$y.range + c(-2,0)
-q13 <- q13 + ylim(col3ylim) + xlim(col3xlim)
+col3xlim <- ggplot_build(q13)$layout$panel_ranges[[1]]$x.range
+col3ylim <- ggplot_build(q13)$layout$panel_ranges[[1]]$y.range
+# q13 <- q13 + ylim(col3ylim) + xlim(col3xlim)
 
 q21 <- filter(plot_df3, type=="lmm") %>%
   ggplot(aes(x=intercept, y=halfdiff)) + geom_hex() +
@@ -122,14 +123,21 @@ q21 <- filter(plot_df3, type=="lmm") %>%
   my_theme + xlim(col1xlim) + ylim(col1ylim)
 
 q22 <- filter(plot_df3, type=="lmm") %>%
-  ggplot(aes(x=log(summary(lmm_fit)$sigma), y=intercept)) + geom_violin(color="darkblue", alpha=0)+
-  geom_vline(xintercept=log(summary(lmm_fit)$sigma), linetype=2, color="darkblue")+
-  my_theme + coord_flip() + ylim(col2xlim) + xlim(col2ylim)
+  ggplot(aes(x=intercept, y=flow_cell)) + geom_hex() + 
+  scale_fill_continuous(trans="log", breaks=c(1, 10, 100, 1000), low="white", high="darkblue")+
+  my_theme + xlim(col2xlim) + ylim(col2ylim)
+  # #geom_violin(color="darkblue", alpha=0)+
+  # geom_vline(xintercept=log(summary(lmm_fit)$sigma), linetype=2, color="darkblue")+
+  # my_theme + coord_flip() + ylim(col2xlim) + xlim(col2ylim)
 
 q23 <- filter(plot_df3, type=="lmm") %>%
-  ggplot(aes(x=log(summary(lmm_fit)$sigma), y=halfdiff)) + geom_violin(color="darkblue", alpha=0)+
-  geom_vline(xintercept=log(summary(lmm_fit)$sigma), linetype=2, color="darkblue")+
-  my_theme + coord_flip() + ylim(col3xlim) + xlim(col3ylim)
+  ggplot(aes(x=halfdiff, y=flow_cell)) + geom_hex() + 
+  scale_fill_continuous(trans="log", breaks=c(1, 10, 100, 1000), low="white", high="darkblue")+
+  my_theme + xlim(col3xlim) + ylim(col3ylim)
+# %>%
+#   ggplot(aes(x=log(summary(lmm_fit)$sigma), y=halfdiff)) + geom_violin(color="darkblue", alpha=0)+
+#   geom_vline(xintercept=log(summary(lmm_fit)$sigma), linetype=2, color="darkblue")+
+#   my_theme + coord_flip() + ylim(col3xlim) + xlim(col3ylim)
 
 # qnull <- ggplot() + theme_void()
 q31 <- bnp %>%
@@ -138,19 +146,19 @@ q31 <- bnp %>%
   my_theme + xlim(col1xlim) + ylim(col1ylim)
 
 q32 <- bnp %>%
-  ggplot(aes(x=intercept, y=log_sigma)) + geom_hex() +
+  ggplot(aes(x=intercept, y=flow_cell)) + geom_hex() +
   scale_fill_continuous(trans="log",breaks=c(1,10,100,1000),low="white", high = "darkblue")+
   my_theme + xlim(col2xlim) + ylim(col2ylim)
 
 q33 <- bnp %>%
-  ggplot(aes(x=halfdiff, y=log_sigma)) + geom_hex() +
+  ggplot(aes(x=halfdiff, y=flow_cell)) + geom_hex() +
   scale_fill_continuous(trans="log",breaks=c(1,10,100,1000),low="white", high = "darkblue")+
   my_theme + xlim(col3xlim) + ylim(col3ylim)
 
 qqq <- ggmatrix(list(q11,q12,q13,q21,q22,q23,q31,q32,q33),3,3,
                 xAxisLabels = c("paste('Half-Diff. vs Intercept')",
-                                "paste(log(sigma),' vs Intercept')",
-                                "paste(log(sigma),' vs Half-Diff.')"),
+                                "paste('Flow Cell vs Intercept')",
+                                "paste('Flow Cell vs Half-Diff.')"),
                 yAxisLabels = c("OLS", "LMM", "BNP"),
                 labeller = label_parsed,
                 legend=1
