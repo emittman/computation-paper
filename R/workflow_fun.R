@@ -3,7 +3,7 @@ initialize_chain <- function(seed, methodPi){
   cat(methodPi)  
     
   set.seed(seed)
-  load("data/cuda_dat.RData")
+  load("data/cuda_dat.Rdata")
   load("data/ind_est.RData")
   priors <- formatPriors(K=2^12, estimates = ind_est, A=3, B=3/sqrt(cuda_dat$G))
   
@@ -45,7 +45,7 @@ initialize_chain <- function(seed, methodPi){
 
   
 sample_bnp_model <- function(settings){
-  load("data/cuda_dat.RData")
+  load("data/cuda_dat.Rdata")
   set.seed(settings$seed)
   samples <- with(settings, mcmc(cuda_dat, priors, control, init.chain))
   samples
