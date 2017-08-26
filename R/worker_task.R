@@ -9,7 +9,7 @@ pkgs <- c('dplyr', 'cudarpackage')
 lapply(pkgs, library,  character.only = TRUE, quietly=TRUE )
 
 # inputs
-load('targets.Rdata')
+load('targets.RData')
 source('workflow_fun.R')
 
 # ==================================================
