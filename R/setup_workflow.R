@@ -22,4 +22,4 @@ my_plan <- plan(
 
 check(my_plan)
 # plot_graph(my_plan)
-save(my_plan, "targets.RData")
+save(my_plan, file = "targets.RData")
