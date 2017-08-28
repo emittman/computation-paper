@@ -6,13 +6,13 @@ load("data/cuda_dat.Rdata")
 load("data/ind_est.RData")
 
 
-priors <- formatPriors(K=2^12, estimates = ind_est, A=3, B=3/sqrt(cuda_dat$G))
+priors <- formatPriors(K=2^10, estimates = ind_est, A=3, B=3/sqrt(cuda_dat$G))
 
 C <- list(diff_expr = matrix(c(0, 1, 0),1,3, byrow=T)) 
 
 contr <- formatControl(n_iter = 2,
                        thin = 1,
-                       warmup = 1000,
+                       warmup = 10000,
                        methodPi = "symmDirichlet",
                        idx_save = 1,
                        n_save_P = 1,
@@ -22,7 +22,7 @@ contr <- formatControl(n_iter = 2,
 start.chain <- initFixedGrid(priors = priors, estimates = ind_est, C = C)
 # init.run <- mcmc(cuda_dat, priors, contr, start.chain)
 # saveRDS(init.run, "init-run.rds")
-init.run <- readRDS("init-run.rds")
+init.run <- readRDS("init-run-long.rds")
 id <- order(init.run[['state']]$pi, decreasing=TRUE)
 init.chain <- with(init.run[['state']], 
                    formatChain(beta = beta[,id],
@@ -31,7 +31,7 @@ init.chain <- with(init.run[['state']],
                                zeta =  start.chain$zeta,
                                alpha = alpha,
                                C = C))
-contr$n_iter <- as.integer(50000)
+contr$n_iter <- as.integer(500000)
 contr$thin <- as.integer(5)
 contr$warmup <- as.integer(10000)
 contr$idx_save <- 0:9
@@ -42,4 +42,4 @@ contr$n_save_P <- as.integer(100)
 
 contr$methodPi <- "stickBreaking"
 sd <- mcmc(cuda_dat, priors, contr, init.chain)
-saveRDS(sd, "RDA-SB.rds")
+saveRDS(sd, "RDA-SB-long.rds")
