@@ -45,7 +45,7 @@ initialize_chain <- function(seed, K, n.iter, methodPi){
 
   
 sample_bnp_model <- function(settings){
-  load("data/cuda-dat-ind.Rdata")
+  load("data/cuda-dat-std.Rdata")
   set.seed(settings$seed)
   samples <- with(settings, mcmc(cuda_dat, priors, control, init.chain))
   samples
