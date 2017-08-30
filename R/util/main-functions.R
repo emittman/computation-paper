@@ -4,7 +4,7 @@ initialize_chain <- function(seed, K, n.iter, methodPi){
     
   set.seed(seed)
   load("data/cuda-dat-std.Rdata")
-  load("data/ind-std.RData")
+  load("data/ind-est-std.RData")
   priors <- formatPriors(K=K, estimates = ind_est, A=3, B=3/sqrt(cuda_dat$G))
   
   C <- list(diff_expr = matrix(c(0, 1, 0),1,3, byrow=T)) 
