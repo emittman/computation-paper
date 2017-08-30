@@ -2,7 +2,7 @@ library(cudarpackage)
 library(dplyr)
 set.seed(24807923)
 source("../util/main-functions.R")
-load("/data/cuda-dat-std.Rdata")
+load("data/cuda-dat-std.Rdata")
 
 #run a pilot chain and reorder clusters
 inits <- initialize_chain(sample(1e8,1), K=2^10, n.iter=100, methodPi="stickBreaking")
