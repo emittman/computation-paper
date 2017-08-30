@@ -6,7 +6,7 @@ load("data/cuda_dat.Rdata")
 load("data/ind_est.RData")
 
 
-priors <- formatPriors(K=2^10, estimates = ind_est, A=3, B=3/sqrt(cuda_dat$G))
+priors <- formatPriors(K=1.5*2^10, estimates = ind_est, A=3, B=3/sqrt(cuda_dat$G))
 
 C <- list(diff_expr = matrix(c(0, 1, 0),1,3, byrow=T)) 
 

@@ -4,13 +4,15 @@
 \newcommand{\code}{\texttt}
 
 \section{Introduction}
-We consider the model given by $Y_{gi}|x_i \ind F(\theta_{g}| x_i)$, $g=1,\ldots,G$, $i=1,\ldots,N$ with $G\gg N$ and the quantities of interest are functions of $\theta_g$. In this setting, there is potential benefit to borrow information across group level, $g$, to reduce variance. A common approach is to assume that the $\theta_g$ are independent, identically distributed according to some probability distribution, $\mathcal{P}$, belonging to a parametric family of distributions. Under this framework, $\mathcal{P}$ can then be estimated allowing for conditional inference, or a prior distribution can be given on its parameters allowing for fully Bayesian inference. While this approach can be useful in practice, the influence of the choice of a particular parametric family can be considerable. This choice is often not reflective of a priori information, but rather due to convention or convenience. THe choice of a `nonparametric prior', or a prior distribution over the set of probability distributions in $\mathbb{R}^p$, avoids making parameteric assumptions about $\mathcal{P}$. The most widely used such prior distribution in the literature of Bayesian nonparametrics is the Dirichlet process (DP).
+Gene expression studies consider comparisons between groups of the expression at many loci on the genome. Typically, because of the large number of loci relative to the number of specimens, the potential for false discrimination is large. Because of this, there is demand for statistical methods that reduce the number of `false positives' by leveraging information across genes to inform on gene-specific inference.
+
+Consider the model given by $Y_{gi}|x_i \ind F(\theta_{g}| x_i)$, $g=1,\ldots,G$, $i=1,\ldots,N$ with $G\gg N$ and the quantities of interest are functions of $\theta_g$. In this setting, there is potential benefit to borrow information across group level, $g$, to reduce variance. A common approach is to assume that the $\theta_g$ are independent, identically distributed according to some probability distribution, $\mathcal{P}$, belonging to a parametric family of distributions. Under this framework, $\mathcal{P}$ can then be estimated allowing for conditional inference, or a prior distribution can be given on its parameters allowing for fully Bayesian inference. While this approach can be useful in practice, the influence of the choice of a particular parametric family can be considerable. This choice is often not reflective of a priori information, but rather due to convention or convenience. THe choice of a `nonparametric prior', or a prior distribution over the set of probability distributions in $\mathbb{R}^p$, avoids making parameteric assumptions about $\mathcal{P}$. The most widely used such prior distribution in the literature of Bayesian nonparametrics is the Dirichlet process (DP).
 
 Much effort has gone into researching methods for analyzing gene expression. Some of the most successful have been made publically available as R packages \cite{edger2010},\cite{deseq2014}. These methods attempt to account for the mean-variance trend, which can vary from data set to data set. Similarly, plots of empirical estimates of $\beta_g$, coefficients of regression on a log scale, suggest complex structures of dependency among some components of $\beta_g$. These show distributional shapes -- features such as mulitmodality, spikes and heavy tails -- which are not easily characterized by a parametric distribution. These observations seem to suggest two things: a) a joint model, $(\beta_g, \sigma^2_g) \ind \mathcal{P}$, should be useful, by providing a means for regularizing inference that accounts for dependence between components, and b) the prior distribution for $\mathcal{P}$ should spread prior mass over a large distributional space.
 
 A number of Gibbs sampling algorithms for MCMC have been proposed, based on a marginalization over the random measure $\mathcal{P}$ \citep{neal2000}. Variations of this have shown to be effective in practice. However, for large $G$, these algorithms are not computationally tractable as they require one-at-a-time updating of the cluster assignment for each $g$ conditioning on all $g'\neq g$. The ``stick-breaking" representation of the DP, due to \citet{sethuraman}, provides a way to explicitly sample $\mathcal{P}$. By conditioning on $\mathcal{P}$, the assignment of clusters can be done in parallel due to conditional independence. \citet{suchard} proposed algorithms for such ``massive" mixture models that target graphics processing units (GPUs), which use the inherent parallel processing power to acheive large speed-ups in computation time. In this paper we describe an implementation of the approach outlined by \citet{suchard}, and apply it to gene expression data.
 
-Section \ref{sec:model} presents a hierarchical regression model for gene expression with truncated Dirichlet process prior. The full posterior distribution is given in subsection \ref{subsec:posterior}. Section \ref{sec:computation} offers general remarks regarding the implementation strategy. Subsections \ref{subsec:upsweep} and \ref{subsec:downsweep} provide some introductory material regarding parallel algorithms. The rest of this section describes the libraries and tools which were useful in developing our application. Section \ref{sec:implement} describes the details of our implementation, concentrating on the steps for the Gibbs sampler, which are at the core of our method. In subsection \ref{subsec:output} we consider how we cope with the memory bottleneck, which prevents storing most MCMC samples. Section \ref{sec:timing} presents a study of the rate of mixing for different sized data sets and sampler settings. In the final section, we consider some extensions...
+Section \ref{sec:model} presents a hierarchical regression model for gene expression with truncated Dirichlet process prior. Section \ref{sec:computation} offers general remarks regarding the implementation strategy. Section \ref{sec:routine} provides some introductory material regarding parallel algorithms. The rest of this section describes the libraries and tools which were useful in developing our application. Section \ref{sec:implement} describes the details of our implementation, concentrating on the steps for the Gibbs sampler, which are at the core of our method. In subsection \ref{subsec:output} we consider how we cope with the memory bottleneck, which prevents storing most MCMC samples. Section \ref{sec:timing} presents a study of the rate of mixing for different sized data sets and sampler settings. In the final section, we consider some extensions...
 % In summary, to avoid sensitivity to the prior distribution on $\mathcal{P}$, we propose to model it as a truncated Dirichlet process. Advances in computers have seen a rapid increase in the use of Markov Chain Monte Carlo (MCMC) methods for fitting sophisticated statistical models. Because such methods rely on thousands or even millions of simluated draws generated one after another, fast computing is critical to making them computationally feasible. Nonparametric Bayesian methods are no different in this regard, but when the size of the data set gets moderately large, the computational effort required per draw can be enormous as the number of parameters grows with the sample size. Graphics processing units (GPUs) have potential in this area, provided that most of the work can be divided into many parallel tasks which operate on different pieces of memory. By exploiting conditional independence in the model and making use of parallelized algorithms, we demonstrate the feasibility of nonparametric Bayesian modeling in the ``big data" setting of gene expression data.
 
 \section{Model}
@@ -114,6 +116,7 @@ Threads are themselves organized into ``warps". When data is read from global me
 \end{itemize}
 
 \subsection{Routines}
+\label{sec:routines}
 \subsubsection{Reductions}
 \label{subsec:reduce}
 On the GPU, individual processors are slow, memory transfer is slow, and asynchronous tasks can result in many idle threads. In order to acheive speed-ups, algorithms must exploit parallelism and must do so in a way that respects the limitations of the hardware. A simple example is reduction. Given some data in memory, $x_1, x_2, \ldots, x_n$, and an \textit{associative} operator $\oplus$, the problem is to compute $x_1 \oplus x_2 \oplus \ldots \oplus x_n$. 
@@ -351,14 +354,15 @@ increases subsequent draws for $\pi_k$, and so forth. In particular,
 especially when $p$ is moderately large, during the initial stages the
 $K^{th}$ cluster can become occupied. This leads to very large draws
 for $\alpha$, which can greatly decrease the quality of the truncation
-approximation. To avoid this problem, we reorder the cluster indices by their current value of $\pi_k$ after a short initial run, then proceed to subsequent burn-in iterations. Figure \ref{fig:max-id} shows traceplots of a series of Markov chains where reordering has been applied to each. The top frame shows the maximum occupied cluster ID and the bottom frame shows the value of $\alpha$. This example is simulated data with $G=40,000,\, p=6,\, \mbox{and } K=8000$.
+approximation. To avoid this problem, we reorder the cluster indices by their current value of $\pi_k$ after a short initial run, then proceed to subsequent burn-in iterations. 
+%Figure \ref{fig:max-id} shows traceplots of a series of Markov chains where reordering has been applied to each. The top frame shows the maximum occupied cluster ID and the bottom frame shows the value of $\alpha$. This example is simulated data with $G=40,000,\, p=6,\, \mbox{and } K=8000$.
 
-\begin{figure}
-\includegraphics[height=.4\textheight]{5-cycles-max-id}
-\includegraphics[height=.4\textheight]{5-cycles-alpha}
-\caption{Traceplots demonstrating high-level behavior after periodic reordering of cluster ids. Top: 5 series, maximum occupied cluster. Bottom: 5 series, $\alpha$.}
-\label{fig:max-id}
-\end{figure}
+% \begin{figure}
+% \includegraphics[height=.4\textheight]{5-cycles-max-id}
+% \includegraphics[height=.4\textheight]{5-cycles-alpha}
+% \caption{Traceplots demonstrating high-level behavior after periodic reordering of cluster ids. Top: 5 series, maximum occupied cluster. Bottom: 5 series, $\alpha$.}
+% \label{fig:max-id}
+% \end{figure}
 
 
 \subsection{Output}
@@ -372,25 +376,92 @@ Because of the dimensionality of the problem is large, memory transfer between t
 \end{enumerate}
 Updates of these quantities are embarrasingly parallel across $g$, so are well suited to the GPU. The update in 1) is done elementwise, based on a running sum, and the update in 2) can be decomposed into four tasks, a matrix multiplication to compute $C\beta$, an elementwise evaluation of the sign of the value, a parallel setwise reduction using the minimum to evaluate each conjunction, and finally an update of the estimator (using the same functionality as 1)).
 
+
+
 \section{Simulation Study}
-The time required by our method will depend both on the raw computational effort, as well as the efficiency of the algorithm. For this reason we choose to use the time per effective sample, which incorporates both of these factors. In particular, we focus on $\alpha$ for simplicity and because it tends to reflect changes in the overall behavior of the Gibbs sampler.
+To study the performance, we conducted a simulation study. To assess the time requirements, because time efficiency will depend both on the algorithmic implementation, that is, the raw time it takes to complete an MCMC iteration, but also on the statistical efficiency, i.e. the rate of mixing and the autocorrelation of the chain. Because it accounts for both factors, the measure we focus on is the time per effective sample. In particular, we focus on the samping for $\alpha$, both for simplicity and because it tends to reflect changes in the overall behavior of the Gibbs sampler.
 
-For our experiment, we considered three factors: $G$, the number of genes, $p$, the dimension of $\beta_g$, and $K$, the truncation limit. For each combination of the levels of these three factors we simulated data as follows:
+We work with simulated data and consider three factors: $G$, the number of genes, $K$, the truncation limit, and $p$, the dimension of $\beta_g$. For each combination of the levels of these three factors we simulated data as shown below.
 
-\begin{enumerate}
-  \item Let $K_{occ} = \op{floor}(G^{0.5})$. For $k=1 \ldots K_{occ}$, draw $\tilde{\beta}_k \sim \op{N}(0, C),\; \tilde{\sigma^2}_k \sim \op{IG}(1, 1)$, where $C=\op{diag}(3, 3/2^2, \ldots, 3/p^2)$.
+\paragraph{Cluster parameters}
+Let $K_{t} = \op{floor}(G^{0.5})$. For $k=1 \ldots K_{t}$, draw $\tilde{\beta}_k \sim \op{Normal}(0, C),\; \tilde{\sigma^2}_k \sim \op{Gamma}(1, 1)$, where $C=\op{diag}(3, 3/2^2, \ldots, 3/p^2)$.
   
-  \item For $g=1,\ldots G$, draw $\zeta_g \sim \op{Cat}(1/K_{occ},\ldots,1/K_{occ})$. 
+\paragraph{Allocation to clusters} For $g=1,\ldots G$, draw $\zeta_g \sim \op{Categorical}(1/K_{occ},\ldots,1/K_{occ})$. 
   
-  \item Let $X = \begin{pmatrix} 1_{4 \times 1} & 0_{1\times(p-1)}\\
-                                 1_{4(p-1) \times 1} & I_{(p-1)\times(p-1)} \end{pmatrix}$. Draw $y_{g} \sim \op{N}(X\tilde{\beta}_{\zeta_g}, \tilde{\sigma}^2_{\zeta_g}).$
-\end{enumerate}
+\paragraph{Conditionally normal data}
+ Let $X = \begin{pmatrix} 1_{4 \times 1} & 0_{1\times(p-1)}\\
+                                 1_{4(p-1) \times 1} & I_{(p-1)\times(p-1)} \otimes 1_{4\times 1} \end{pmatrix}$, where $\otimes$ is the Kronecker product. Draw $y_{g} \sim \op{Normal}(X\tilde{\beta}_{\zeta_g}, \tilde{\sigma}^2_{\zeta_g}).$
 
 
-In this experiment we set $m_\beta = m,\, C_\beta = C,\, a_\sigma^2=1,\, b_\sigma^2=1$, matching the true values, and we set the prior for $\alpha$ as described in section \ref{sec:model}.
+In this experiment we set the prior to the true values for $m_\beta = m$, and $C_\beta = C$ and set $a_\sigma^2=1$ and $b_\sigma^2=1$. Note that the true values $\sigma^2_k$ come from a gamma distribution, rather than an inverse gamma, which would have lead to dispropotionately high error variances for some genes. The prior for $\alpha$ is the one described in section \ref{sec:model}, with the prior expectation close or equal to the true value.
 
+Results of the simulation study are presented in Table \ref{table:neff-alpha}.
 
-Time per MCMC iteration in seconds for each simulation. It appears that the time required grows sublinearly in $G$ and linearly in $K$. We should note that the sample size, $N$, itself has no impact, because the sufficient summary statistics do not scale with $N$.
+% latex table generated in R 3.4.1 by xtable 1.8-2 package
+% Mon Aug 28 15:21:01 2017
+\begin{table}[ht]
+\centering
+\begin{tabular}{rrrrrr}
+
+  &   & \multicolumn{3}{c}{K}\\
+  \hline
+G & p & 1024 & 2048 & 4096 \\ 
+  \hline
+4096  & 2 & 17 & 30 & 241 \\ 
+      & 4 & 9 & 8 & 127 \\ 
+      & 6 & 3 & 4 & 140 \\ 
+8192  & 2 & 28 & 40 & 231 \\ 
+      & 4 & 11 & 19 & 111 \\ 
+      & 6 & 7 & 21 & 35 \\ 
+16384 & 2 & 25 & 56 & 167 \\ 
+      & 4 & 13 & 25 & 150 \\ 
+      & 6 & 8 & 17 &  \\ 
+32768 & 2 & 66 & 101 & 267 \\ 
+      & 4 & 6 & 46 & 113 \\ 
+      & 6 & 12 & 31 & 108 \\ 
+   \hline
+\end{tabular}
+\caption{Number of seconds per effective sample for $\alpha$. Each value is computed from a 50,000 MCMC iterations (a single chain).}
+\label{table:neff-alpha}
+\end{table}
+
+\begin{figure}
+\centering
+\includegraphics[width=.9\textwidth]{neff-marginal}
+\caption{Number of effective samples for $\alpha$ marginalizing over the third factor (left:K, right:G).}
+\label{fig:neff-marginal}
+\end{figure}
+
+% latex table generated in R 3.4.1 by xtable 1.8-2 package
+% Tue Aug 29 13:29:34 2017
+\begin{table}[ht]
+\centering
+\begin{tabular}{rrr}
+  \hline
+ & Estimate & Std. Error\\ 
+  \hline
+$\beta_1$ & -17.6 & 2.2\\ 
+  $\beta_2$ & -18.9 & 2.2\\ 
+  $\beta_3$ & -19.4 & 2.2\\ 
+  $\beta_4$ & 0.4 & 0.1\\ 
+  $\beta_5$ & 1.7 & 0.1\\
+   \hline
+\end{tabular}
+\caption{Estimated coefficients for the linear regression model,\\\hspace{\textwidth}%
+$\log_2 (\mbox{sec. per eff. sample})=\beta_1 1_{p=2}+\beta_2 1_{p=4} + \beta_3 1_{p=6} + \beta_4 \log_2(G) + \beta_5 \log_2(K) + \epsilon$.}
+\label{regression}
+\end{table}
+
+Table \ref{regression} shows the result of fitting a linear regression of $\log_2(\frac{\mbox{seconds}}{\mbox{effective sample}}$ on $\log_2(K)$, $\log_2(G)$ and $V$. The estimated coefficients of this additive model suggest that seconds per effective sample grows sublinearly in $G$, approximately quadratic in $K$ and inversely with $V$.
+
+This last observation may seem counterintutive; however, because the posterior variability of $\alpha$ depends on the stability of the the partition of genes into clusters, and as $p$ increases so does the distance between clusters, $\alpha$, like the partition, has fewer viable moves. This phenomenon is also on display in Figure \ref{alpha-trace} where the normalized traceplots seem to show shorter and less extreme excursions in the higher dimensions.
+
+\begin{figure}
+\centering
+\includegraphics[width=.9\textwidth]{alpha-efficiency}
+\caption{Centered and scaled traceplots for $\alpha$ across levels of $p$ for various settings of $G$ and $K$.}
+\label{alpha-trace}
+\end{figure}
 
 \section{Example: Paschold maize data}
 \citet{paschold} produced an RNA-seq data set for gene expression of root tissue from samples, one sample from each of four young plants representing each of four maize genotypes. The genotypes were two recombinant inbred varieties, B73 and Mo17 and two crosses, B73$\times$Mo17 and Mo17$\times$B73. The plants were at an early stage where phenotypical differences between the genotypes were not yet displayed. A potentially interesting feature that RNA-seq can help address is which genes demonstrate evidence of a difference in expression between two genotypes. At present, we will consider B73 and B73$\times$Mo17.
@@ -411,61 +482,69 @@ We let $Y_{gci} = \log \frac{Z_{gci}+1}{C_{ci}}$, where $Z_{gi}$ is the total re
 \label{design}
 \end{equation*}
 
+We fit the model using four independent chains. They were initialized by setting unique random seeds and running 1000 iterations, then reordering the cluster indices by $\pi$. 50,000 iterations were run for each chain after 10,000 iterations of burn-in. Potential scale reduction factors are shown in figure \ref{rhat}. Values close to 1 are consistent with convergence; 1.1 has been suggested as a cut-off. While some parameters exceeded 1.1, the vast majority were close to 1.
+
+\begin{figure}
+\centering
+\includegraphics[width=.8\textwidth]{rhats-param}
+\caption{Gelman-Rubin potential scale reduction factors for all gene-specific parameters.}
+\label{rhat}
+\end{figure}
+
 \subsection{Comparison of methods}
 In addition to our method, we also fit the data using two other model: a linear mixed-effects model, treating gene-specific parameters as random effects, and all genes independently using least squares. For every method we parameterized the gene-specific mean by an intercept term and a half-difference term -- $\frac{1}{2}(\mbox{B73}\times\mbox{Mo17}-\mbox{B73})$. The independence model, which produces a gene-specific variance estimate borrows no information across genes. The linear mixed-effects model assumes a bivariate normal distribution for all the gene-specific mean parameters. Because the covariance and the mean of this distribution is estimatated from the data, this model does borrow information across genes (since software assumes a zero mean for the random gene effects, we also estimate a fixed effect which corresponds to the unknown mean.) This method assumes homogeneity of the error variance across genes.
 
 \begin{figure}
-\includegraphics[width=.7\textwidth]{lmm_v_ols.pdf}
+\includegraphics[width=.9\textwidth]{method-compare}
 \caption{Comparisons of the parameter estimates under each method.}
-\label{lmm_v_ols}
+\label{method-compare}
 \end{figure}
-Figure \ref{lmm_v_ols} shows a comparison of the estimates under these two models. While there is agreement about the gene-specific intercepts in the two models, there is noticable shrinkage toward the global mean for the half-difference in the linear mixed-effects model. This can be explained by the long tail of these estimates relative to a normal distribution.
+Figure  \ref{method-compare} shows a comparison of the estimates under these two models. While there is agreement about the gene-specific intercepts in the two models, there is noticable shrinkage toward the global mean for the half-difference in the linear mixed-effects model. This can be explained by the long tail of these estimates relative to a normal distribution.
 
 \begin{figure}
-\includegraphics[width=.9\textwidth]{type_v_pairs}
+\includegraphics[width=.9\textwidth]{pairs-3-methods}
 \caption{Bivariate histograms and violin plots describing the joint distribution of estimates obtained from all methods}
-\label{type_v_pairs}
+\label{pairs-3-methods}
 \end{figure}
 
-Plotting pairs of parameter estimates obtained from the different methods shows slight differences in the joint distribution of the gene-specific mean parameters for OLS when compared with those obtained by LMM. The most notable difference between the two models being the homogenous variance assumption of LMM. As suggested here, there is a decreasing trend toward lower variability, as a proportion of the mean, as the mean expression increases.
-
-
-\ref{type_v_pairs}  
+Figure \ref{pairs-3-methods} displays pairs of parameter estimates obtained from the different methods. The top two rows shows slight differences in the joint distribution of the gene-specific mean parameters for OLS when compared with those obtained by LMM. This difference is characterized by a shrinkage of all estimates toward the overall average, which has most noticable impact on the genes which are estimated to be far from that average.
 
 
 
 
-Of particular interest was the identification of genes where the mean hybrid expression is higher or lower than that of both parents. For each gene, a reduced version of the design matrix (collapsing identical rows) is
-\begin{equation*}
-\begin{blockarray}{lcccc}
-  & \beta_1 & \beta_2 & \beta_3 & \beta_4\\
-  \begin{block}{l(cccc)}
-  \mbox{B73} & 1 & 1 & 0 & 0\\
-  \mbox{Mo17} & 1 & -1 & 0 & 0\\
-  \mbox{B73$\times$Mo17} & 1 & 0 & 1 & 1\\
-  \mbox{Mo17$\times$B73} & 1 & 0 & 1 & -1\\
-  \end{block}
-\end{blockarray}
-\label{design}
-\end{equation*}
 
-In figure \ref{ggpairs_us}, histograms of the empirical distributions of the OLS estimates are shown. The irregularities seen here contraindicate the use of simple independent parametric models for the underlying parameters. In particular, we note the multimodality of $\beta_1$, the rotated `V' shape of $(\beta_2,\beta_3)$. Despite a large number of genes, we suspect that a misspecification of the model for these parameters will limit the efficacy of borrowing information across genes. We seek to improve the efficacy of borrowing information by relaxing the model to allow Bayesian learning about the underlying distribution of these parameters.
-\begin{figure}
-\includegraphics[width=\textwidth]{ggpairs_us}
-\caption{Histograms and pairwise histograms of independent OLS
-  estimates to for $(\beta_g,\log \sigma_g)$ for all genes in Paschold data set with a non-zero count.}
-\label{ggpairs_us}
-\end{figure}
 
-Estimates of the posterior means after fitting our model are shown in figure \ref{ggpairs_s}.
-\begin{figure}
-\includegraphics[width=\textwidth]{ggpairs_s}
-\caption{Histograms and pairwise histograms of posterior means of
-  nonparametric model. Relative to the estimates in Figure
-  \ref{ggpairs_us}, there is substantial shrinkage acheived by latent
-  clustering.}
-\label{ggpairs_s}
-\end{figure}
+% Of particular interest was the identification of genes where the mean hybrid expression is higher or lower than that of both parents. For each gene, a reduced version of the design matrix (collapsing identical rows) is
+% \begin{equation*}
+% \begin{blockarray}{lcccc}
+%   & \beta_1 & \beta_2 & \beta_3 & \beta_4\\
+%   \begin{block}{l(cccc)}
+%   \mbox{B73} & 1 & 1 & 0 & 0\\
+%   \mbox{Mo17} & 1 & -1 & 0 & 0\\
+%   \mbox{B73$\times$Mo17} & 1 & 0 & 1 & 1\\
+%   \mbox{Mo17$\times$B73} & 1 & 0 & 1 & -1\\
+%   \end{block}
+% \end{blockarray}
+% \label{design}
+% \end{equation*}
+% 
+% In figure \ref{ggpairs_us}, histograms of the empirical distributions of the OLS estimates are shown. The irregularities seen here contraindicate the use of simple independent parametric models for the underlying parameters. In particular, we note the multimodality of $\beta_1$, the rotated `V' shape of $(\beta_2,\beta_3)$. Despite a large number of genes, we suspect that a misspecification of the model for these parameters will limit the efficacy of borrowing information across genes. We seek to improve the efficacy of borrowing information by relaxing the model to allow Bayesian learning about the underlying distribution of these parameters.
+% \begin{figure}
+% \includegraphics[width=\textwidth]{ggpairs_us}
+% \caption{Histograms and pairwise histograms of independent OLS
+%   estimates to for $(\beta_g,\log \sigma_g)$ for all genes in Paschold data set with a non-zero count.}
+% \label{ggpairs_us}
+% \end{figure}
+% 
+% Estimates of the posterior means after fitting our model are shown in figure \ref{ggpairs_s}.
+% \begin{figure}
+% \includegraphics[width=\textwidth]{ggpairs_s}
+% \caption{Histograms and pairwise histograms of posterior means of
+%   nonparametric model. Relative to the estimates in Figure
+%   \ref{ggpairs_us}, there is substantial shrinkage acheived by latent
+%   clustering.}
+% \label{ggpairs_s}
+% \end{figure}
 
 \section{Discussion}
 Summarise the contribution of this paper. May want to discuss possible extensions, such as changing the data model, adding label-switching moves, etc.

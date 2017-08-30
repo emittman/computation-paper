@@ -18,11 +18,21 @@ lmm$GeneID <- my_dat_wide$GeneID
 lmm_long <- tidyr::gather(lmm, key=genotype, value=est, -GeneID)
 lmm_long$type <- "lmm"
 
-bnp.fit <- readRDS("RDA-SD.rds")
+bnp.fit <- readRDS("RDA-SB.rds")
 bnp <- with(bnp.fit$summaries, data.frame(t(rbind(means_betas,log(means_sigmas)))))
 names(bnp) <- c("intercept","halfdiff","flow_cell","log_sigma")
 bnp$GeneID <- my_dat_wide$GeneID
 bnp_long <- tidyr::gather(bnp, key=genotype, value=est, -GeneID)
+bnp_long$type <- "BNP"
+
+bnp.chain1 <- readRDS("../chains/chain1_sb.rds"); class(bnp.chain1) <- "myMcmcObj"
+bnp.chain2 <- readRDS("../chains/chain2_sb.rds"); class(bnp.chain2) <- "myMcmcObj"
+bnp.chain3 <- readRDS("../chains/chain3_sb.rds"); class(bnp.chain3) <- "myMcmcObj"
+bnp.fit2 <- combine_chains_summaries(bnp.chain1,bnp.chain2,bnp.chain3)
+bnp2 <- with(bnp.fit2, data.frame(t(rbind(means_betas, log(means_sigmas)))))
+names(bnp2) <- c("intercept","halfdiff","flow_cell","log_sigma")
+bnp2$GeneID <- my_dat_wide$GeneID
+bnp_long <- tidyr::gather(bnp2, key=genotype, value=est, -GeneID)
 bnp_long$type <- "BNP"
 
 id <- sample(my_dat_wide$GeneID, size=40)
@@ -42,26 +52,26 @@ facet_names <- c( `lmm` = "LMM", `ols` = "OLS", `BNP` = "BNP",
                   `halfdiff` = "Half-Diff.",
                   `intercept` = "Intercept",
                   `flow_cell` = "Flow cell")
-
 plot_df2 <- spread(plot_df, key=type, value=est)
-p1 <- ggplot(plot_df2, aes(x=ols, y=lmm)) + geom_hex(bins=50) + 
-  geom_abline(slope=1) + 
+plot_df2$genotype <- factor(plot_df2$genotype, levels=c("intercept","halfdiff","flow_cell"))
+p1 <- ggplot(plot_df2, aes(x=ols, y=lmm)) + geom_hex(bins=30) + 
+  geom_abline(slope=1,alpha=.2) + 
   facet_wrap(~genotype, scales="free", labeller=as_labeller(facet_names)) +
   scale_fill_continuous(trans="log", breaks=c(1, 10, 100, 1000), low="white", high="darkblue")+
   theme_bw(base_size=12)+theme(strip.text.y = element_text(size=12),
                                strip.text.x = element_text(size=12))+
   xlab("OLS") + ylab("LMM")
 
-p1.1 <- ggplot(plot_df2, aes(x=ols, y=BNP)) + geom_hex(bins=50) + 
-  geom_abline(slope=1) + 
+p1.1 <- ggplot(plot_df2, aes(x=ols, y=BNP)) + geom_hex(bins=30) + 
+  geom_abline(slope=1,alpha=.2) + 
   facet_wrap(~genotype, scales="free", labeller=as_labeller(facet_names)) +
   scale_fill_continuous(trans="log", breaks=c(1, 10, 100, 1000), low="white", high="darkblue")+
   theme_bw(base_size=12)+theme(strip.text.y = element_text(size=12),
                                strip.text.x = element_text(size=12))+
   xlab("OLS") + ylab("BNP")
 
-p1.2 <- ggplot(plot_df2, aes(x=lmm, y=BNP)) + geom_hex(bins=50) + 
-  geom_abline(slope=1) + 
+p1.2 <- ggplot(plot_df2, aes(x=lmm, y=BNP)) + geom_hex(bins=30) + 
+  geom_abline(slope=1,alpha=.2) + 
   facet_wrap(~genotype, scales="free", labeller=as_labeller(facet_names)) +
   scale_fill_continuous(trans="log", breaks=c(1, 10, 100, 1000), low="white", high="darkblue")+
   theme_bw(base_size=12)+theme(strip.text.y = element_text(size=12),
@@ -70,7 +80,9 @@ p1.2 <- ggplot(plot_df2, aes(x=lmm, y=BNP)) + geom_hex(bins=50) +
 
 leg <- cowplot::get_legend(p1)
 tm.noleg <- theme(legend.position = "none")
-plt.grd1 <- cowplot::plot_grid(cowplot::plot_grid(p1+tm.noleg, p1.1+tm.noleg, p1.2+tm.noleg, ncol=1),leg,rel_widths = c(1,.15))
+plt.grd1 <- cowplot::plot_grid(cowplot::plot_grid(p1+tm.noleg, p1.1+tm.noleg, ncol=1),leg,rel_widths = c(1,.15))
+
+ggsave("../figures_tables/method-compare2.pdf", width=10, height=6)
 
 plot_df3 <- spread(plot_df, key=genotype, value=est)
 
@@ -140,17 +152,17 @@ q23 <- filter(plot_df3, type=="lmm") %>%
 #   my_theme + coord_flip() + ylim(col3xlim) + xlim(col3ylim)
 
 # qnull <- ggplot() + theme_void()
-q31 <- bnp %>%
+q31 <- bnp2 %>%
   ggplot(aes(x=intercept, y=halfdiff)) + geom_hex() +
   scale_fill_continuous(trans="log",breaks=c(1,10,100,1000),low="white", high = "darkblue")+
   my_theme + xlim(col1xlim) + ylim(col1ylim)
 
-q32 <- bnp %>%
+q32 <- bnp2 %>%
   ggplot(aes(x=intercept, y=flow_cell)) + geom_hex() +
   scale_fill_continuous(trans="log",breaks=c(1,10,100,1000),low="white", high = "darkblue")+
   my_theme + xlim(col2xlim) + ylim(col2ylim)
 
-q33 <- bnp %>%
+q33 <- bnp2 %>%
   ggplot(aes(x=halfdiff, y=flow_cell)) + geom_hex() +
   scale_fill_continuous(trans="log",breaks=c(1,10,100,1000),low="white", high = "darkblue")+
   my_theme + xlim(col3xlim) + ylim(col3ylim)
@@ -164,10 +176,19 @@ qqq <- ggmatrix(list(q11,q12,q13,q21,q22,q23,q31,q32,q33),3,3,
                 legend=1
 ) +theme(strip.text.y = element_text(size=12),
          strip.text.x = element_text(size=12))
+ggsave("../figures_tables/pairs-3-methods2.pdf", width=10, height=9)
+
+
+#mean-variance trend log(sigma) vs beta[1]
+mv.trend.df <- data.frame(rbind(cbind(ols, log_sigma = .5*log(ind_est$sigma2), type="OLS"),
+                                cbind(bnp2, type="NB"))
+                          )
+ggplot(mv.trend.df, aes(intercept, log_sigma)) + geom_hex() + facet_wrap(~type)
+
 
 #volcanoplot
-volc.df <- data.frame(effect = bnp.fit$summaries$means_betas[3,],
+volc.df <- data.frame(effect = bnp.fit$summaries$means_betas[2,],
                       probs = bnp.fit$summaries$probs[1,])
 ggplot(volc.df, aes(effect,probs)) + geom_hex(bins=50) +
   scale_fill_continuous(trans="log",breaks=c(1,10,100,1000),low="white", high = "darkblue")+
-  geom_vline(xintercept=0, linetype=2)
+  geom_vline(xintercept=0, linetype=2) + theme_bw()
