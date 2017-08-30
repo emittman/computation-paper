@@ -1,4 +1,4 @@
-initialize_chain <- function(seed, K, n.iter, methodPi){
+initialize_chain <- function(seed, K, n.iter, methodPi, idx=0:9){
 
   cat(methodPi)  
     

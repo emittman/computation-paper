@@ -4,11 +4,14 @@
 \newcommand{\code}{\texttt}
 
 \section{Introduction}
-Gene expression studies consider comparisons between groups of the expression at many loci on the genome. Typically, because of the large number of loci relative to the number of specimens, the potential for false discrimination is large. Because of this, there is demand for statistical methods that reduce the number of `false positives' by leveraging information across genes to inform on gene-specific inference.
+Gene expression profiling studies consider comparisons between experimental groups at many genes on the genome. Typically, because of the large number of comparisons to the number of experimental units, the potential for false discrimination is large. Because of this, there is demand for statistical methods that reduce the number of `false positives' by leveraging information across genes to inform on gene-specific inference.
 
-Consider the model given by $Y_{gi}|x_i \ind F(\theta_{g}| x_i)$, $g=1,\ldots,G$, $i=1,\ldots,N$ with $G\gg N$ and the quantities of interest are functions of $\theta_g$. In this setting, there is potential benefit to borrow information across group level, $g$, to reduce variance. A common approach is to assume that the $\theta_g$ are independent, identically distributed according to some probability distribution, $\mathcal{P}$, belonging to a parametric family of distributions. Under this framework, $\mathcal{P}$ can then be estimated allowing for conditional inference, or a prior distribution can be given on its parameters allowing for fully Bayesian inference. While this approach can be useful in practice, the influence of the choice of a particular parametric family can be considerable. This choice is often not reflective of a priori information, but rather due to convention or convenience. THe choice of a `nonparametric prior', or a prior distribution over the set of probability distributions in $\mathbb{R}^p$, avoids making parameteric assumptions about $\mathcal{P}$. The most widely used such prior distribution in the literature of Bayesian nonparametrics is the Dirichlet process (DP).
+% Consider the model given by $Y_{gi}|x_i \ind F(\theta_{g}| x_i)$, $g=1,\ldots,G$, $i=1,\ldots,N$ with $G\gg N$ and the quantities of interest are functions of $\theta_g$. In this setting, there is potential benefit to borrow information across group level, $g$, to reduce variance.
 
-Much effort has gone into researching methods for analyzing gene expression. Some of the most successful have been made publically available as R packages \cite{edger2010},\cite{deseq2014}. These methods attempt to account for the mean-variance trend, which can vary from data set to data set. Similarly, plots of empirical estimates of $\beta_g$, coefficients of regression on a log scale, suggest complex structures of dependency among some components of $\beta_g$. These show distributional shapes -- features such as mulitmodality, spikes and heavy tails -- which are not easily characterized by a parametric distribution. These observations seem to suggest two things: a) a joint model, $(\beta_g, \sigma^2_g) \ind \mathcal{P}$, should be useful, by providing a means for regularizing inference that accounts for dependence between components, and b) the prior distribution for $\mathcal{P}$ should spread prior mass over a large distributional space.
+A common approach is to model gene-specific parameters as independent, identically distributed according to some probability distribution, $\mathcal{P}$, belonging to a parametric family of distributions. Under this framework, $\mathcal{P}$ can then be estimated allowing for conditional inference, or a prior distribution can be given on its parameters allowing for fully Bayesian inference. While this approach can be useful in practice, the influence of the choice of a particular parametric family can be considerable. This choice is often not reflective of \textit{a priori} information, but rather due to convention or convenience. Here, the choice of a `nonparametric prior', i.e. a prior distribution over a `large' set of probability distributions, provides a way of avoiding having to make parameteric assumptions about $\mathcal{P}$. 
+% The most widely used such prior distribution in the literature of Bayesian nonparametrics is the Dirichlet process (DP).
+
+Much effort has gone into researching methods for analyzing gene expression. Some of the most successful have been made publically available as R packages \citep{edger2010},\citep{deseq2014}, \citep{voom}. A common feature of these methods is that they use between-gene information to learn the the general mean-variance relationship, which can vary from data set to data set, and can be key to acheiving statistical power \cite{voom}. Empirically, we find structure (seen in plots of independently estimated gene-specific parameters) to be present not only between the mean and variance, but also among regression parameter components. This suggests that between-gene information is available not only to regulate gene-level assessment of variance, but also the estimated effects themselves. While others used random effects models for individual regression components [\citep{deseq2},\citep{landau}], they depend on assumptions about the underlying distribution of effects which are contradicted by the data.
 
 A number of Gibbs sampling algorithms for MCMC have been proposed, based on a marginalization over the random measure $\mathcal{P}$ \citep{neal2000}. Variations of this have shown to be effective in practice. However, for large $G$, these algorithms are not computationally tractable as they require one-at-a-time updating of the cluster assignment for each $g$ conditioning on all $g'\neq g$. The ``stick-breaking" representation of the DP, due to \citet{sethuraman}, provides a way to explicitly sample $\mathcal{P}$. By conditioning on $\mathcal{P}$, the assignment of clusters can be done in parallel due to conditional independence. \citet{suchard} proposed algorithms for such ``massive" mixture models that target graphics processing units (GPUs), which use the inherent parallel processing power to acheive large speed-ups in computation time. In this paper we describe an implementation of the approach outlined by \citet{suchard}, and apply it to gene expression data.
 
@@ -438,19 +441,21 @@ G & p & 1024 & 2048 & 4096 \\
 \centering
 \begin{tabular}{rrr}
   \hline
- & Estimate & Std. Error\\ 
+    & Estimate & Std. Error\\ 
   \hline
-$\beta_1$ & -17.6 & 2.2\\ 
+  $\beta_1$ & -17.6 & 2.2\\ 
   $\beta_2$ & -18.9 & 2.2\\ 
   $\beta_3$ & -19.4 & 2.2\\ 
   $\beta_4$ & 0.4 & 0.1\\ 
   $\beta_5$ & 1.7 & 0.1\\
    \hline
 \end{tabular}
-\caption{Estimated coefficients for the linear regression model,\\\hspace{\textwidth}%
-$\log_2 (\mbox{sec. per eff. sample})=\beta_1 1_{p=2}+\beta_2 1_{p=4} + \beta_3 1_{p=6} + \beta_4 \log_2(G) + \beta_5 \log_2(K) + \epsilon$.}
+% \caption[Energy: (Einstein's equation)]{Energy: \(E=mc^2\)}
+\caption[Estimated coefficients for the linear regression model: (model)]{Estimated coefficients for the linear regression model: \\\hspace{\textwidth}\(\log_2$(sec. per eff. sample)$=\beta_1 1_{p=2}+\beta_2 1_{p=4} + \beta_3 1_{p=6} + \beta_4 \log_2(G) + \beta_5 \log_2(K) + \epsilon\).}
+%   Estimated coefficients for the linear regression model,.}
 \label{regression}
 \end{table}
+
 
 Table \ref{regression} shows the result of fitting a linear regression of $\log_2(\frac{\mbox{seconds}}{\mbox{effective sample}}$ on $\log_2(K)$, $\log_2(G)$ and $V$. The estimated coefficients of this additive model suggest that seconds per effective sample grows sublinearly in $G$, approximately quadratic in $K$ and inversely with $V$.
 
