@@ -9,8 +9,8 @@ pkgs <- c('dplyr', 'cudarpackage')
 lapply(pkgs, library,  character.only = TRUE, quietly=TRUE )
 
 # inputs
-load('targets.RData')
-source('workflow_fun.R')
+load('data/targets.RData')
+source('util/main-functions.R')
 
 # ==================================================
 # 1) Create a dataset, run the analysis and its summary
