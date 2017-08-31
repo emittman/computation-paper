@@ -11,12 +11,63 @@ Gene expression profiling studies consider comparisons between experimental grou
 A common approach is to model gene-specific parameters as independent, identically distributed according to some probability distribution, $\mathcal{P}$, belonging to a parametric family of distributions. Under this framework, $\mathcal{P}$ can then be estimated allowing for conditional inference, or a prior distribution can be given on its parameters allowing for fully Bayesian inference. While this approach can be useful in practice, the influence of the choice of a particular parametric family can be considerable. This choice is often not reflective of \textit{a priori} information, but rather due to convention or convenience. Here, the choice of a `nonparametric prior', i.e. a prior distribution over a `large' set of probability distributions, provides a way of avoiding having to make parameteric assumptions about $\mathcal{P}$. 
 % The most widely used such prior distribution in the literature of Bayesian nonparametrics is the Dirichlet process (DP).
 
-Much effort has gone into researching methods for analyzing gene expression. Some of the most successful have been made publically available as R packages \citep{edger2010},\citep{deseq2014}, \citep{voom}. A common feature of these methods is that they use between-gene information to learn the the general mean-variance relationship, which can vary from data set to data set, and can be key to acheiving statistical power \cite{voom}. Empirically, we find structure (seen in plots of independently estimated gene-specific parameters) to be present not only between the mean and variance, but also among regression parameter components. This suggests that between-gene information is available not only to regulate gene-level assessment of variance, but also the estimated effects themselves. While others used random effects models for individual regression components [\citep{deseq2},\citep{landau}], they depend on assumptions about the underlying distribution of effects which are contradicted by the data. An special case of gene expression profiling is differential expression between two groups. Because expression is typically modeled on the log scale, the differential expression at a particular gene, termed `log-fold-change', is the parameter of interest. \citet{liu} proposed a semi-parametric model treating the log-fold-change parameters as random effects following an unknown distribution, $\mathcal{P}$, where $\mathcal{P}$ is a random distribution arising from a Dirichlet process. In this paper, we generalize this approach for arbitrary gene profiling experiments. In our method, we assume that both the $p$-dimensional gene-specific regression coefficient,$\beta_g$, and variance, $\sigma^2_g$, follow $(p+1)-$dimensional distribution $\mathcal{P}$, the form of which is unknown but to be learned via Bayes' rule.
+Much effort has gone into researching methods for analyzing gene expression. Several have been released as R packages \citep{edger2010},\citep{deseq2014}, \citep{voom}. A common feature of these methods is that they use between-gene information to learn the the general mean-variance relationship, which can vary from data set to data set, and can be key to acheiving statistical power \cite{voom}. Empirically, we find structure (seen in plots of independently estimated gene-specific parameters) to be present not only between the mean and variance, but also among regression parameter components. This suggests that between-gene information is available not only to regulate gene-level assessment of variance, but also the estimated effects themselves. While others used random effects models for individual regression components [\citep{deseq2014},\citep{landau}], they depend on assumptions about the underlying distribution of effects which are contradicted by the data. An special case of gene expression profiling is differential expression between two groups. Because expression is typically modeled on the log scale, the differential expression at a particular gene, termed `log-fold-change', is the parameter of interest. \citet{liu} proposed a semi-parametric model treating the log-fold-change parameters as random effects following an unknown distribution, $\mathcal{P}$, where $\mathcal{P}$ is a random distribution arising from a Dirichlet process. In this paper, we generalize this approach for arbitrary gene profiling experiments. In our method, we assume that both the $p$-dimensional gene-specific regression coefficient,$\beta_g$, and variance, $\sigma^2_g$, follow $(p+1)-$dimensional distribution $\mathcal{P}$, the form of which is unknown but to be learned via Bayes' rule.
 
 A number of Gibbs sampling algorithms for such models, referred to as `Dirichlet process mixtures', have been proposed. These can be categorized into two types, often referred to as `marginal' and `conditional.' based on a marginalization over the random measure $\mathcal{P}$ \citep{neal2000}. Variations of this have shown to be effective in practice. However, for large $G$, these algorithms are not computationally tractable as they require one-at-a-time updating of the cluster assignment for each $g$ conditioning on all $g'\neq g$. The ``stick-breaking" representation of the DP, due to \citet{sethuraman}, provides a way to explicitly sample $\mathcal{P}$. By conditioning on $\mathcal{P}$, the assignment of clusters can be done in parallel due to conditional independence. \citet{suchard} proposed algorithms for such ``massive" mixture models that target graphics processing units (GPUs), which use the inherent parallel processing power to acheive large speed-ups in computation time. In this paper we describe an implementation of the approach outlined by \citet{suchard}, and apply it to gene expression data.
 
-Section \ref{sec:model} presents a hierarchical regression model for gene expression with truncated Dirichlet process prior. Section \ref{sec:computation} offers general remarks regarding the implementation strategy. Section \ref{sec:routine} provides some introductory material regarding parallel algorithms. The rest of this section describes the libraries and tools which were useful in developing our application. Section \ref{sec:implement} describes the details of our implementation, concentrating on the steps for the Gibbs sampler, which are at the core of our method. In subsection \ref{subsec:output} we consider how we cope with the memory bottleneck, which prevents storing most MCMC samples. Section \ref{sec:timing} presents a study of the rate of mixing for different sized data sets and sampler settings. In the final section, we consider some extensions...
+Section \ref{sec:data} introduces the kinds of data we consider to be suitable for use with our method and necessary preprocessing steps. Section \ref{sec:model} presents our model for gene expression, elaborating on the hierarchical structure which allows for nonparameteric learning of the underlying distribution of the gene-specific parameters. In this section we outline a Gibbs sampler for MCMC. In Section \ref{sec:implementation}, we review two parallel versions algorithms and revisit the Gibbs steps, identifying where parallelism can be exploited. We also discuss a strategy for avoiding having to store MCMC samples, which can require an onerous amount of memory. To investigate the properties of our algorithm, in Section \ref{sec:timing} we explore the results of a study of the speed, as measured by the average time per `effectively independent' sample, across a range of data and model dimensions. To provide an illustration of our method, we analyze differential expression data from an experiment on maize seedlings and contrast our results with a mixed-effects model which assumes that regression parameters follow a multivariate normal distribution.
 % In summary, to avoid sensitivity to the prior distribution on $\mathcal{P}$, we propose to model it as a truncated Dirichlet process. Advances in computers have seen a rapid increase in the use of Markov Chain Monte Carlo (MCMC) methods for fitting sophisticated statistical models. Because such methods rely on thousands or even millions of simluated draws generated one after another, fast computing is critical to making them computationally feasible. Nonparametric Bayesian methods are no different in this regard, but when the size of the data set gets moderately large, the computational effort required per draw can be enormous as the number of parameters grows with the sample size. Graphics processing units (GPUs) have potential in this area, provided that most of the work can be divided into many parallel tasks which operate on different pieces of memory. By exploiting conditional independence in the model and making use of parallelized algorithms, we demonstrate the feasibility of nonparametric Bayesian modeling in the ``big data" setting of gene expression data.
+\section{Data}
+\label{sec:data}
+We consider gene expression data that can be represented in a tabular format, with rows corresponding to genes and columns to samples (for an abbreviated example, see table \ref{tab:data}). Data meeting this requirement include RNA-seq read counts, but could equally be applied to microarray data. Relevant metadata for the samples include information about groupings, either due to experimental treatment, technical design or natural biological groupings by population. Metadata for the genes themselves, while of great importance to the biologist, are not used by our method.
+
+% latex table generated in R 3.4.1 by xtable 1.8-2 package
+% Thu Aug 31 13:00:59 2017
+\begin{table}[ht]
+\centering
+\caption{\small Sample of RNA-seq total read counts from \citep{paschold}. Columns names identify samples, including the genotype and a replicate number, from which we can infer the flow cell that was used for sequencing. Gene annotation information, while available, is not considered as our method does not make use of it.}
+\vspace{.2in}
+\label{tab:data}
+\begin{tabular}{lrrrrrrrr}
+  \hline
+ & $\mbox{B73}_1$ & $\mbox{B73}_2$ & $\mbox{B73}_3$ & $\mbox{B73}_4$ & $\mbox{Mo17}_1$ & $\mbox{Mo17}_2$ & $\mbox{Mo17}_3$ & $\mbox{Mo17}_4$ \\ 
+  \hline
+$\mbox{gene}_1$ &   1 &   0 &   0 &   2 &   0 &   1 &   0 &   0 \\ 
+$\mbox{gene}_2$ &   3 &   4 &   6 &   0 &   8 &  17 &  18 &  20 \\ 
+$\mbox{gene}_3$ & 2323 & 1533 & 1932 & 1945 & 2070 & 1582 & 2196 & 1882 \\ 
+$\mbox{gene}_4$ &   2 &   1 &   0 &   2 &   4 &   4 &   5 &   3 \\ 
+$\vdots$ &    &    &    &  $\vdots$   &   &   &   &  $\vdots$ \\ 
+   \hline
+\end{tabular}
+\end{table}
+
+\paragraph{Normalization} For various technical reasons, normalization of the table columns (`between-sample' normalization) is needed to adjust for systematic differences arising from technical factors unrelated to the quantities of interest.
+
+For example, in RNA-seq experiments, the total of all read counts (`library size') for a sample will vary, in part, due to differences in sequencing depth. A simple adjustment for library size is to convert total read counts to a relative proportion, such as counts per million (cpm). A criticism of this approach to normalization is that the library size may be driven primarily by a few highly sequenced genes, making this approach too volatile. More robust approaches have been proposed; for further discussion, see \citet{oshlack2010rna}.
+
+\paragraph{Transformation} Because the data are non-negative and variability in expression tends to increase with the overall expression,  gene expression data is typically analyzed on a logarithmic scale, with difference in expression being multiplicative. The large number of zero counts usually present in RNA-seq data, preclude taking logarithms of the raw data. Using a generalized linear modeling approach avoids this problem by specifying a discrete probability model for the counts, while the log-mean expression is modeled as a linear function of the model parameters.
+
+For computational reasons, we assume a normal model for the data after transforming it. First, we compute normalization factor $c_i$ for each column; second, we take logarithms of the data, after adding 1, and apply the normalization on the log scale, .i.e.
+$$\mbox{transformed log-count in column }i = \log (\mbox{original count in column }i+1) + \log(c_i)$$. The result after applying these steps to the data in Table \ref{tab:data} are shown in Table \ref{tab:data-transformed}.
+
+% latex table generated in R 3.4.1 by xtable 1.8-2 package
+% Thu Aug 31 14:28:27 2017
+\begin{table}[ht]
+\centering
+\caption{\small Same sample of RNA-seq total read counts as in Table \ref{tab:data}, after transformation and normalization. Weighted trimmed mean of M-values normalization was performed using the \texttt{calcNormFactors} function in \texttt{edgeR} \cite{edger2010}.}
+\vspace{.2in}
+\begin{tabular}{ccccccccc}
+  \hline
+ & $\mbox{B73}_1$ & $\mbox{B73}_2$ & $\mbox{B73}_3$ & $\mbox{B73}_4$ & $\mbox{Mo17}_1$ & $\mbox{Mo17}_2$ & $\mbox{Mo17}_3$ & $\mbox{Mo17}_4$ \\ 
+  \hline
+$\mbox{gene}_1$ & 0.59 & -0.05 & 0.02 & 1.11 & -0.02 & 0.69 & 0.05 & 0.09 \\ 
+$\mbox{gene}_2$ & 1.28 & 1.56 & 1.97 & 0.01 & 2.18 & 2.89 & 3.00 & 3.13 \\ 
+$\mbox{gene}_3$ & 7.65 & 7.29 & 7.59 & 7.58 & 7.61 & 7.36 & 7.75 & 7.63 \\ 
+$\mbox{gene}_4$ & 0.99 & 0.64 & 0.02 & 1.11 & 1.59 & 1.61 & 1.85 & 1.48 \\ 
+$\vdots$ &  &  &  & $\vdots$ &  & &  & $\vdots$ \\ 
+   \hline
+\end{tabular}
+\end{table}
 
 \section{Model}
 \label{sec:model}
@@ -100,78 +151,6 @@ p(\beta,\sigma^2,\mathcal{P}|y) = p(\zeta, \tilde{\beta},\tilde{\sigma^2},\nu | 
 \end{equation*}
 The first equality follows from the  invariance to reparameterization of the posterior distribution, and the last equality follows from the product rule of conditionally independent random variables.
 
-\section{Computation on the GPU}
-\label{sec:computation}
-\subsection{General Remarks}
-Modern GPUs offer hundreds or thousands of cores that can all execute a program concurrently. This is a big advantage over multi-core CPUs which typically have fewer than ten processors. If one decides to implement a program using a GPU, there are contraints that they need to be aware of.
-\begin{itemize}
-\item
-In the usual set-up, the main program in run on a CPU which turns over control periodically to the GPU to run specific tasks. These tasks, or ``kernels", follow the single instruction, multiple data (SIMD) paradigm. Each core on the GPU is assigned to work on a specific chunk of memory, but all cores execute the same program. Each instance of the program is called a ``thread". It is desirable to avoid branching logic in kernels, in part because the GPU cores are relatively slow, so branching can easily lead to high latency. The best results are obtained by having all threads proceed in lockstep.
-
-\item
-The GPU has its own memory system. Because copying memory from host (CPU) to device (GPU) and visa versa is slow, if possible, data input should be copied only once from the host CPU to GPU memory and when the task is completed, it should be copied once back only once to the CPU.
-
-\item
-When programming for the CPU, memory accesses tend to be fast. On the GPU, while the thread local memory is fast, its size is limited, and reading and writing from global memory is slow. Therefore, kernels need to limit both reads and memory allocation, or else the potential gain in speed due to parallelism will be lost due to memory bottlenecks.
-
-\item
-Threads are themselves organized into ``warps". When data is read from global memory, it reads not one address at a time, but in chunks to minimize overhead costs. To take advantage of this, consecutively indexed threads should use data from memory at consecutive addresses. When this happens, the reads are ``coalesced". If consecutive threads access addresses that are distant to one another, reads are not coalesced, which will make memory transfer inefficient, hence the program will tend to be slow.
-\end{itemize}
-
-\subsection{Routines}
-\label{sec:routines}
-\subsubsection{Reductions}
-\label{subsec:reduce}
-On the GPU, individual processors are slow, memory transfer is slow, and asynchronous tasks can result in many idle threads. In order to acheive speed-ups, algorithms must exploit parallelism and must do so in a way that respects the limitations of the hardware. A simple example is reduction. Given some data in memory, $x_1, x_2, \ldots, x_n$, and an \textit{associative} operator $\oplus$, the problem is to compute $x_1 \oplus x_2 \oplus \ldots \oplus x_n$. 
-
-\begin{pseudocode}[ruled]{Reduce}{a}
-\label{upsweep}
-\COMMENT{Parallel reduction of $n=2^d$ elements (upsweep step of scan).}\\
-\FOR i \GETS 1 \TO \log_2 n \DO \BEGIN
-  \FOR j \GETS 1 \TO n \mbox{ in parallel }\DO \BEGIN
-    \IF j \mbox{ mod } 2^i \DO \BEGIN
-    a[j] \GETS a[j-2^{i-1}] + a[j];\\
-    \END \END \END
-\RETURN{a}
-\end{pseudocode}
-
-Assuming no constraint on the number of processors, algorithm \ref{upsweep} describes a GPU-friendly way to tackle this problem. In the first iteration of the outer loop, the inner loop keeps a maximal number of threads are busy with an identical task, requiring similar and parallel memory accesses, two reads and one write. While half of these threads become idle in subsequent loops, the active threads always write to the same place. In practice, since device memory is not flat, as was discussed in the previous subsection, an optimal implementation would make use of shared memory after the first read. Reading and writing from shared memory is much faster than from global memory and is accessible to all threads in a block.
-
-% CUDA users who want to take advantage of GPU parallelism without concerning themselves with the optimization should be aware of the Thrust library \cite{thrust}. Thrust is based on the C++ Standard Template Library and provides both containers for handling allocation and deallocation of device memory as well as generic algorithms, such as \code{thrust::reduce}.
-
-
-%\caption{Parallel reduction of $n=2^d$ elements (upsweep step of scan). Upon return, total is stored in $a[n]$.}
-
-\subsubsection{Scans}
-\citet{blelloch1990} described a general algorithm for computing $x_1,
-x_1 \oplus x_2, \ldots, x_1 \oplus \ldots \oplus x_n$. This result is required at multiple points in our MCMC algorithm. An example is the calculation of cumulative probabilities in multinomial sampling. (In this case, the probabilities are on the log scale for stability, so that $\oplus=\log(e^{x_1}+e^{x_2})$.) The natural serial algorithm, $z_1 = x_1,\;z_2 = z_1 \otimes x_2,\dots$, is ill-suited to the GPU. Blelloch showed that there is an efficient parallel alternative. The simple case of an array with $2^d$ elements and $2^{d-1}$ processors consists of a parallel reduction (``upsweep"; algorithm \ref{upsweep}), followed by a downsweep (algorithm \ref{downsweep}. Given an input array $a$, the algorithm modifies the input with the result that each element contains the sum of all the previous elements in the original. In some cases this is the desired result; otherwise, the array is shifted to the right and the total from the upsweep is appended. In case that the number of threads is restricted, a solution is to divide the data up among the processors and perform a reduction on each subset. Next, a prescan can be performed on the processor totals, which are stored to memory. Finally, a series of scans can be performed on the subsets as desired, using the scanned processor totals as offsets \cite{blelloch1990}.
-\begin{pseudocode}[ruled]{Prescan}{a}
-\label{downsweep}
-\COMMENT{Produce prescan of the original elements in $a$.}\\
-a \GETS \CALL{Reduce}{a}\\
-a[n] \GETS 0\\
-\FOR i \GETS d \TO 1 \DO \BEGIN
-  \FOR j \GETS 1 \TO n \mbox{ in parallel }\DO \BEGIN
-    \IF j \mbox{ mod } 2^i = 2^{i-1} \DO \BEGIN
-    tmp \GETS a[j];\\
-    a[j] \GETS a[j + 2^{i-1}];\\
-    a[j + 2^{i-1}] \GETS tmp \oplus a[j + 2^{i-1}];
-    \END \END \END
-\RETURN{a}
-\end{pseudocode}
-
-
-If $P$ processors are available
-the time required to scan $n$ elements is on the order $O(n/P + \log_2P)$, versus $O(n)$ for the serial algorithm. This is the same as the parallel reduction.
-% Parallel scans are implemented in Thrust, called with \code{inclusive\_scan} for a full scan and \code{exclusive\_scan} for a prescan.
-%\subsubsection{Pseudo-random number generation}
-
-% Parallel uniform and normal random number generation. For the (inverse) gamma draws, the method of \citet{simplegamma} is used, pairs of which can be transformed to produce beta draws.
-
-%\subsubsection{Linear algebra}
-%For computationally intensive tasks, such as matrix multiplication, much of the work can be done independently. Because much of the work requires repeated use of the same data, however, the optimal solution depends on both the hardware and the size of the problem. Fortunately, much of this work has already been done. Just as is the case in plain C, it is recommended to use APIs to optimized, documented libraries which are being developed and made available for GPUs.
-% Many LAPACK/BLAS routines, including matrix multiplication, solving lower triangular matrix equations, matrix-vector multiplication and dot product.
-
 
 \section{MCMC}
 \label{sec:mcmc}
@@ -241,14 +220,88 @@ thus requiring multinomial sampling.
   \end{equation*}
 \end{enumerate}
 
-\subsection{Implementation}
-\label{subsec:implement}
+\section{Computation on the GPU}
+\label{sec:computation}
+\subsection{General Remarks}
+Modern GPUs offer hundreds or thousands of cores that can all execute a program concurrently. This is a big advantage over multi-core CPUs which typically have fewer than ten processors. If one decides to implement a program using a GPU, there are contraints that they need to be aware of.
+\begin{itemize}
+\item
+In the usual set-up, the main program in run on a CPU which turns over control periodically to the GPU to run specific tasks. These tasks, or ``kernels", follow the single instruction, multiple data (SIMD) paradigm. Each core on the GPU is assigned to work on a specific chunk of memory, but all cores execute the same program. Each instance of the program is called a ``thread". It is desirable to avoid branching logic in kernels, in part because the GPU cores are relatively slow, so branching can easily lead to high latency. The best results are obtained by having all threads proceed in lockstep.
+
+\item
+The GPU has its own memory system. Because copying memory from host (CPU) to device (GPU) and visa versa is slow, if possible, data input should be copied only once from the host CPU to GPU memory and when the task is completed, it should be copied once back only once to the CPU.
+
+\item
+When programming for the CPU, memory accesses tend to be fast. On the GPU, while the thread local memory is fast, its size is limited, and reading and writing from global memory is slow. Therefore, kernels need to limit both reads and memory allocation, or else the potential gain in speed due to parallelism will be lost due to memory bottlenecks.
+
+\item
+Threads are themselves organized into ``warps". When data is read from global memory, it reads not one address at a time, but in chunks to minimize overhead costs. To take advantage of this, consecutively indexed threads should use data from memory at consecutive addresses. When this happens, the reads are ``coalesced". If consecutive threads access addresses that are distant to one another, reads are not coalesced, which will make memory transfer inefficient, hence the program will tend to be slow.
+\end{itemize}
+
+\subsection{Routines}
+\label{sec:routines}
+\subsubsection{Reductions}
+\label{subsec:reduce}
+On the GPU, individual processors are slow, memory transfer is slow, and asynchronous tasks can result in many idle threads. In order to acheive speed-ups, algorithms must exploit parallelism and must do so in a way that respects the limitations of the hardware. A simple example is reduction. Given some data in memory, $x_1, x_2, \ldots, x_n$, and an \textit{associative} operator $\oplus$, the problem is to compute $x_1 \oplus x_2 \oplus \ldots \oplus x_n$. 
+
+\begin{pseudocode}[ruled]{Reduce}{a}
+\label{upsweep}
+\COMMENT{Parallel reduction of $n=2^d$ elements (upsweep step of scan).}\\
+\FOR i \GETS 1 \TO \log_2 n \DO \BEGIN
+  \FOR j \GETS 1 \TO n \mbox{ in parallel }\DO \BEGIN
+    \IF j \mbox{ mod } 2^i \DO \BEGIN
+    a[j] \GETS a[j-2^{i-1}] \oplus a[j];\\
+    \END \END \END
+\RETURN{a}
+\end{pseudocode}
+
+Assuming no constraint on the number of processors, algorithm \ref{upsweep} describes a GPU-friendly way to tackle this problem. In the first iteration of the outer loop, the inner loop keeps a maximal number of threads are busy with an identical task, requiring similar and parallel memory accesses, two reads and one write. While half of these threads become idle in subsequent loops, the active threads always write to the same place. In practice, since device memory is not flat, as was discussed in the previous subsection, an optimal implementation would make use of shared memory after the first read. Reading and writing from shared memory is much faster than from global memory and is accessible to all threads in a block.
+
+% CUDA users who want to take advantage of GPU parallelism without concerning themselves with the optimization should be aware of the Thrust library \cite{thrust}. Thrust is based on the C++ Standard Template Library and provides both containers for handling allocation and deallocation of device memory as well as generic algorithms, such as \code{thrust::reduce}.
+
+
+%\caption{Parallel reduction of $n=2^d$ elements (upsweep step of scan). Upon return, total is stored in $a[n]$.}
+
+\subsubsection{Scans}
+\citet{blelloch1990} described a general algorithm for computing $x_1,
+x_1 \oplus x_2, \ldots, x_1 \oplus \ldots \oplus x_n$. This result is required at multiple points in our MCMC algorithm. An example is the calculation of cumulative probabilities in multinomial sampling. (In this case, the probabilities are on the log scale for stability, so that $\oplus=\log(e^{x_1}+e^{x_2})$.) The natural serial algorithm, $z_1 = x_1,\;z_2 = z_1 \otimes x_2,\dots$, is ill-suited to the GPU. Blelloch showed that there is an efficient parallel alternative. The simple case of an array with $2^d$ elements and $2^{d-1}$ processors consists of a parallel reduction (``upsweep"; algorithm \ref{upsweep}), followed by a downsweep (algorithm \ref{downsweep}. Given an input array $a$, the algorithm modifies the input with the result that each element contains the sum of all the previous elements in the original. In some cases this is the desired result; otherwise, the array is shifted to the right and the total from the upsweep is appended. In case that the number of threads is restricted, a solution is to divide the data up among the processors and perform a reduction on each subset. Next, a prescan can be performed on the processor totals, which are stored to memory. Finally, a series of scans can be performed on the subsets as desired, using the scanned processor totals as offsets \cite{blelloch1990}.
+\begin{pseudocode}[ruled]{Prescan}{a}
+\label{downsweep}
+\COMMENT{Produce prescan of the original elements in $a$.}\\
+a \GETS \CALL{Reduce}{a}\\
+a[n] \GETS 0\\
+\FOR i \GETS d \TO 1 \DO \BEGIN
+  \FOR j \GETS 1 \TO n \mbox{ in parallel }\DO \BEGIN
+    \IF j \mbox{ mod } 2^i = 2^{i-1} \DO \BEGIN
+    tmp \GETS a[j];\\
+    a[j] \GETS a[j + 2^{i-1}];\\
+    a[j + 2^{i-1}] \GETS tmp \oplus a[j + 2^{i-1}];
+    \END \END \END
+\RETURN{a}
+\end{pseudocode}
+
+
+If $P$ processors are available
+the time required to scan $n$ elements is on the order $O(n/P + \log_2P)$, versus $O(n)$ for the serial algorithm. This is the same as the parallel reduction.
+% Parallel scans are implemented in Thrust, called with \code{inclusive\_scan} for a full scan and \code{exclusive\_scan} for a prescan.
+%\subsubsection{Pseudo-random number generation}
+
+% Parallel uniform and normal random number generation. For the (inverse) gamma draws, the method of \citet{simplegamma} is used, pairs of which can be transformed to produce beta draws.
+
+%\subsubsection{Linear algebra}
+%For computationally intensive tasks, such as matrix multiplication, much of the work can be done independently. Because much of the work requires repeated use of the same data, however, the optimal solution depends on both the hardware and the size of the problem. Fortunately, much of this work has already been done. Just as is the case in plain C, it is recommended to use APIs to optimized, documented libraries which are being developed and made available for GPUs.
+% Many LAPACK/BLAS routines, including matrix multiplication, solving lower triangular matrix equations, matrix-vector multiplication and dot product.
+
+
+
+\subsection{Gibbs sampler revisited: exploiting parallelism}
+\label{subsec:gibbs-revisited}
 Owing to conjugacy, the full conditional distributions have simple closed form expressions. By drawing from each full conditional per iteration of the Markov chain, the sequence of draws converge to a set of draws from the posterior distribution.
 
 Insofar as the computation for these full conditionals depends on the data, it is only through summary statistics, which can be partially pre-computed (at the gene level). Therefore, $y_g^\top W_g y_g$, $y_g^\top W_g X$, and $X^\top W_g X$ are computed once, prior to sampling, and saved in device memory. Also, in order to coalesce memory accesses for different steps, $\{y_g^\top W_g X\}_{1:G}$ is stored in two ways; continguous gene-wise, and continguous
 element-wise.
 
-\subsubsection{Allocation parameters}
+\paragraph{Allocation parameters}
 The computational complexity for this step is $O(GKp^2)$. Fortunately, computation of the unnomalized multinomial weights is an embarassingly parallel problem. For numerical stability, these weights are computed on the log scale. From (\ref{zetafull}),
 \begin{equation}
 \label{logweight}
@@ -259,7 +312,7 @@ In our implementation, first, separate kernels compute a) $y_g^\top W_g X \beta_
 
 To perform the categorical sampling of $\zeta$, we first perform a cumulative sum/scan of the weights (using log-sum-exp for numerical stability) for each gene. Define $S_{g,k}$ to be the $k^{th}$ partial log sum for gene $g$. Next, we draw $log U_g$, $U_g \sim \op{U}(0,1)$ add add the respective total log sum, $S_{g,K}$, obtaining $V_g = \log U_g + S_{g,K}$. Next, we have a kernel evaluate the comparison, $S_{g,k}<V_g$, returning $1$ if true and $0$ if false. The resulting $G\times K$ array is then reduced over each value of $g$, the result updating $\zeta$.
 
-\subsubsection{Cluster atoms}
+\paragraph{Cluster atoms}
 A prerequisite to drawing from the full conditional distribution for the cluster atoms is to compute cluster summary statistics. Although this seems fairly straightforward, as it consists mainly to several reductions, this step is not nicely parallelizable as the elements to reduce are not contiguous, the groups being determined by the current value of $\zeta$. Rather than sorting (and copying) the data for each summary, only $\zeta$ is sorted and the resulting permutation is stored. Now, rather than sorting first, a scatter operation can be fused with a reduction that references the sorted $\zeta$ as a key. Note that these cluster summaries omit unoccupied clusters. Since the conditional distribution for cluster $k$ depends on ``updated" prior parameters that represent a combination of the data and the priors, it is convenient to fill a $K$-dimensional parameter vector, do the required computation for the occupied clusters, the scatter it back to the $K$-dimensional vector so that both occupied and unoccupied clusters can be updated at the same time.
 
 \paragraph{Cluster regression coefficients}
@@ -284,61 +337,17 @@ second, quadratic forms for $\beta_k^\top\left( \sum_{g:\zeta_g=k}
   X^\top W_g X \right) \beta_k$ and lastly, parallel summation of
 these with $\sum_{g:\zeta_g=k}y_g^\top y_g.$
 
-\subsubsection{Cluster weights}
+\paragraph{Cluster weights}
 
 The conjugate beta draws for $\nu_k$ each require two parameters. The
 first shape parameters are computed by parallel elementwise addition;
 the second can be computed using a parallel scan, in reverse order, of $M_k$.
 
-\subsubsection{Mass parameter}
+\paragraph{Mass parameter}
 
 The scalar parameter $\alpha$ depends only on the constants $K$, $a_\alpha$ and $b_\alpha$, and the scalar quantity $\pi_K$. This step can be conveniently performed by the CPU.
 
-\subsection{CUDA libraries}
-There are several libraries that make implementing these algorithms easier in CUDA. Thrust \cite{thrust} extends many concepts from the C++ Standard Template Library to Nvidia GPUs. Included are several useful generic algorithms:
-\begin{itemize}
-\item \code{thrust::for\_each}: This algorithm accepts a functor (an
-  instance of a class with a member \code{operator()} function)
-  and an iterator. The serial version increments the iterator, passing
-  each element to the \code{operator()} in turn. The parallel implementation
-  produces the same results, only in thread parallel fashion. The
-  \code{thrust::zip\_iterator} is very useful, as it can be used
-  to iterate
-  over a \code{thrust::tuple}. This approach is very general, allowing
-  for operations involving up to ten variables using an AoS
-  design.
 
-\item \code{thrust::reduce/reduce\_by\_key}: As described in section
-  \ref{sec:computation}, both reduce and scan are defined for any associative binary operators. Reduce by key accepts a key argument and a compatible binary predicate that identifies changes in the key. For example, for the binary predicate \code{x == y}, the key \code{\{1,1,1,2,2,1\}} would have the result be three quantities, the reductions of the first three values, the next two and the last, respectively.
-
-\item \code{thrust::inclusive/exclusive\_scan/scan\_by\_key}: Thrust
-  offers multiple versions of the scan algorithm. The ``exclusive''
-  version is a prescan, where the first element in the result is
-  always the identity element, and the ``inclusive'' version is a full
-  scan, with the last element being equal to the result of a reduction
-  of the elements in the vector.
-\end{itemize}
-
-For linear algebra on the GPU, standard installations of CUDA also
-include CUBLAS \cite{cublas}. CUBLAS has implementions of BLAS/LAPACK
-routines optimized for the GPU. Typically, calls to the CUBLAS
-functions are initiated by the CPU and act on device memory (host
-API). For newer GPUs (compute 3.5 and later), there are routines that
-can be initiated within a kernel (device API). From the host API, our
-algorithm uses \code{cublasDgemm} for multiplying large matrices in
-device memory. From the
-device API, our algorithm uses \code{cublasDtrsv} to solve many small triangular
-systems of equations in parallel.
-
-Schemes for parallel pseudo-random number generation (PRNG) have been
-developed for CUDA. Since PRNGs are deterministic and sequential, a
-natural parallel adaptation is access the same sequence at locations
-distant enough to avoid overlap or to use a strided access
-pattern. CURAND \cite{curand}, provides such functionality for generating
-normal and uniform random numbers on the GPU. For other distributions,
-such as gamma,
-one can write a custom kernel, making use of CURAND as a source of
-randomness, for threaded sampler.
 
 \subsection{Multimodality and initialization}
 \label{subsec:initialization}
@@ -555,5 +564,50 @@ Figure \ref{pairs-3-methods} displays pairs of parameter estimates obtained from
 Summarise the contribution of this paper. May want to discuss possible extensions, such as changing the data model, adding label-switching moves, etc.
 
 
+\appendix
+\section{CUDA libraries}
+There are several libraries that make implementing these algorithms easier in CUDA. Thrust \citep{thrust} extends many concepts from the C++ Standard Template Library to Nvidia GPUs. Included are several useful generic algorithms:
+\begin{itemize}
+\item \code{thrust::for\_each}: This algorithm accepts a functor (an
+  instance of a class with a member \code{operator()} function)
+  and an iterator. The serial version increments the iterator, passing
+  each element to the \code{operator()} in turn. The parallel implementation
+  produces the same results, only in thread parallel fashion. The
+  \code{thrust::zip\_iterator} is very useful, as it can be used
+  to iterate
+  over a \code{thrust::tuple}. This approach is very general, allowing
+  for operations involving up to ten variables using an AoS
+  design.
 
+\item \code{thrust::reduce/reduce\_by\_key}: As described in section
+  \ref{sec:computation}, both reduce and scan are defined for any associative binary operators. Reduce by key accepts a key argument and a compatible binary predicate that identifies changes in the key. For example, for the binary predicate \code{x == y}, the key \code{\{1,1,1,2,2,1\}} would have the result be three quantities, the reductions of the first three values, the next two and the last, respectively.
+
+\item \code{thrust::inclusive/exclusive\_scan/scan\_by\_key}: Thrust
+  offers multiple versions of the scan algorithm. The ``exclusive''
+  version is a prescan, where the first element in the result is
+  always the identity element, and the ``inclusive'' version is a full
+  scan, with the last element being equal to the result of a reduction
+  of the elements in the vector.
+\end{itemize}
+
+For linear algebra on the GPU, standard installations of CUDA also
+include CUBLAS \cite{cublas}. CUBLAS has implementions of BLAS/LAPACK
+routines optimized for the GPU. Typically, calls to the CUBLAS
+functions are initiated by the CPU and act on device memory (host
+API). For newer GPUs (compute 3.5 and later), there are routines that
+can be initiated within a kernel (device API). From the host API, our
+algorithm uses \code{cublasDgemm} for multiplying large matrices in
+device memory. From the
+device API, our algorithm uses \code{cublasDtrsv} to solve many small triangular
+systems of equations in parallel.
+
+Schemes for parallel pseudo-random number generation (PRNG) have been
+developed for CUDA. Since PRNGs are deterministic and sequential, a
+natural parallel adaptation is access the same sequence at locations
+distant enough to avoid overlap or to use a strided access
+pattern. CURAND \cite{curand}, provides such functionality for generating
+normal and uniform random numbers on the GPU. For other distributions,
+such as gamma,
+one can write a custom kernel, making use of CURAND as a source of
+randomness, for threaded sampler.
 
