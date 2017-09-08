@@ -1,0 +1,71 @@
+\documentclass{article}
+\usepackage{tkz-graph} 
+\usepackage{amsmath,amsfonts}
+\usetikzlibrary{shapes.geometric}%   
+\usepackage[graphics,tightpage,active]{preview}
+\PreviewEnvironment{tikzpicture}
+\PreviewEnvironment{equation}
+\PreviewEnvironment{equation*}
+\newlength{\imagewidth}
+\newlength{\imagescale}
+\pagestyle{empty}
+\thispagestyle{empty}
+\begin{document}
+\tikzstyle{VertexStyle} = [shape            = ellipse,
+                           minimum width    = 6ex,%
+                           draw]
+
+\tikzstyle{EdgeStyle}   = [->,>=stealth']      
+
+\begin{tikzpicture}[scale=1.5]
+% \Vertex[Math, square, L={(a_\alpha,b_\alpha)}, x=-6.5,y=1.5]{ab-alpha}
+\node[name=ab-alpha,shape=rectangle] at (-6,1.5) [draw] {{$(a_\alpha,b_\alpha)$}};
+\Vertex[Math, L=\alpha, x=-4.5, y=1.5]{alpha}
+% \Vertex[Math, L=Q, x=-4.5, y=.50]{q}
+\node[minimum width    = 6ex, name=q,shape=rectangle] at (-4.5,.5) [draw] {$Q$};
+\Vertex[Math, L={\mathcal{P}}, x=-3.5, y=1]{p}
+\Vertex[Math, L={(\beta,\sigma^2)}, x=-2, y=1]{theta}
+% \Vertex[Math, L=y, x=-0.5, y=1]{y}
+\node[minimum width    = 6ex, name=y,shape=rectangle] at (-.5,1) [draw] {$y$};
+\Edges(ab-alpha,alpha)
+\Edges(alpha,p)
+\Edges(q, p)
+\Edges(p,theta)
+\Edges(theta,y)
+\draw (-2.75,0) -- (-2.75,2) -- (0,2) -- (0,0) -- cycle;
+\draw[color=black] (-.2,.2) node{$g$};
+
+% \Vertex[Math, L={(a_\alpha,b_\alpha)}, x=-6.5,y=-1.5]{ab-alpha}
+\node[name=ab-alpha,shape=rectangle] at (-6.25,-1.5) [draw] {{$(a_\alpha,b_\alpha)$}};
+\Vertex[Math, L=\alpha, x=-5, y=-1.5]{alpha}
+\Vertex[Math, L={\nu}, x=-3.5, y=-1.5]{nu}
+\Vertex[Math, L=\zeta, x=-2,y=-1.5]{zeta}
+% \Vertex[Math, L=Q, x=-5, y=-2.75]{q}
+\node[name=q,shape=rectangle, minimum width    = 6ex] at (-5,-2.75) [draw] {$Q$};
+\Vertex[Math, L={\mathcal{P}}, x=-4.55, y=-2.125]{p}
+\Vertex[Math, L={(\tilde{\beta},\tilde{\sigma^2})}, x=-3.5, y=-2.75]{bst}
+\Vertex[Math, L={(\beta,\sigma^2)}, x=-2, y=-2.75]{bs}
+% \Vertex[Math, L=y, x=-0.5, y=-2.125]{y}
+\node[name=y,shape=rectangle, minimum width    = 6ex] at (-.5,-2.125) [draw] {$y$};
+\Edges(ab-alpha,alpha)
+\Edges(alpha,nu)
+\Edges(nu,zeta)
+\Edges(q,bst)
+% \Edges[dotted](bst,bs)
+\path[->,dashed,>=stealth'] (bst) edge (bs)
+                 (zeta) edge (bs)
+                 (nu) edge  (p)
+                 (bst) edge (p);
+\Edges(bs,y)
+% \Edges[dotted](zeta,bs)
+\draw (-2.75,-3.5) -- (-2.75,-1) -- (0,-1) -- (0,-3.5) -- cycle;
+\draw[color=black] (-.2,-3.3) node{$g$};
+\draw (-4.1,-3.5) -- (-4.1,-1) -- (-2.9,-1) -- (-2.9,-3.5) -- cycle;
+\draw[color=black] (-3.1,-3.3) node{$k$};
+\draw (.2,-0.5) -- (-7,-0.5) -- (-7,2.2) -- (.2,2.2) -- cycle;
+\draw (-7,-0.5) -- (-7,-3.7) -- (.2,-3.7) -- (.2,2.2);
+\draw(-6.8,-3.5) node{$b)$};
+\draw(-6.8,-.3) node{$a)$};
+\end{tikzpicture}
+\end{document} 
+\end{document}
