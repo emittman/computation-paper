@@ -13,6 +13,13 @@ A common approach is to model gene-specific parameters as independent, identical
 
 Much effort has gone into researching methods for analyzing gene expression. Several have been released as R packages \citep{edger2010},\citep{deseq2014}, \citep{voom}. A common feature of these methods is that they use between-gene information to estimate the the  mean-variance relationship nonparametrically. This relationship can be key to acheiving statistical power; it involves both biological and technological sources of variation and varies from dataset to dataset\cite{voom}. Empirically, we have observed structure to be present not only between the mean and variance, but also among regression parameter components (see Fig. \ref{pairs-ind-est}). This suggests that between-gene information is available not only to regulate gene-level assessment of variance, but also the estimated effects themselves. While others used random effects models for individual regression components [\citep{deseq2014},\citep{landau}], they depend on assumptions about the underlying distribution of effects, such as independence, which are contradicted by the data.
 
+\begin{figure}[ht]
+\centering
+\includegraphics[width=.6\textwidth]{pairs-ind-est-std}
+\caption{Bivariate histograms of independent estimates of effects and standard deviation obtained by ordinary least squares for 36,081 genes (data from \cite{paschold}). This example shows that random effects models assuming normality and/or independence may not be suitable for modeling gene expression hierarchically. For more on the data, including definitions of $\beta_1$, $\beta_2$, $\beta_3$, and $\sigma$, see Section \ref{sec:analysis}.}
+\label{pairs-ind-est}
+\end{figure}
+
 A special case of gene expression profiling concerning two populations is differential gene expression. Because expression is typically modeled on the log scale, the differential expression at a particular gene, termed `log-fold-change', is the parameter of interest. \citet{liu} proposed a semiparametric model treating the log fold change parameters as random effects following an unknown distribution, $\mathcal{P}$, where $\mathcal{P}$ is a random distribution arising from a Dirichlet process. In this paper, we modify and extend the approach taken by \cite{liu} to allow nonparametric inference for a large class of gene profiling experiments. In our method, we use a DP to model jointly the distribution of the $p$-dimensional gene-specific regression coefficient,$\beta_g$, and variance, $\sigma^2_g$.
 
 %The parameters of the DP either chosen, specifying a prior distribution on $\mathcal{P}$, or by placing a prior on these parameters. 
@@ -20,7 +27,7 @@ Common practice for Bayesian nonparametric applications is to sample from the jo
 
 When $\mathcal{P}$ is not of particular interest, marginal approaches are often preferable. However, for large $G$, these algorithms are not computationally tractable as they require one-at-a-time updating of the cluster assignment for each $g$ conditioning on all $g'\neq g$. On the other hand, conditional Gibbs methods, which depend on the ``stick-breaking" representation of the DP \citet{sethuraman}, are amenable to parallelism because cluster assignment is conditionally independent given $\mathcal{P}$. \citet{suchard} argued for wider use of graphics processing units (GPUs) by statisticians for computationally demanding, parallelizable tasks to acheive large speed-ups in real time. We provide a brief introduction to computing in the massively parallel context, including some general guidelines that can help in designing implementations that are well-suited for the GPU. We demonstrate that Dirichlet process mixture models for gene expression is feasible in practice by utilizing currently available GPU technology and describe how the implementation was contructed in light of the guidelines.
 
-Section \ref{sec:data} introduces the structure of gene expression profiling data suitable for our method and recommended preprocessing steps. Section \ref{sec:model} presents our model for gene expression, elaborating on the hierarchical structure which allows for nonparameteric learning of the underlying distribution of the gene-specific parameters. In this section we outline a Gibbs sampler for MCMC. In Section \ref{sec:implementation}, we review two parallel versions algorithms and revisit the Gibbs steps, identifying where parallelism can be exploited. We also discuss a strategy for avoiding having to store MCMC samples, which can require an onerous amount of memory. To investigate the properties of our algorithm, in Section \ref{sec:timing} we explore the results of a study of the speed, as measured by the average time per `effectively independent' sample, across a range of data and model dimensions. To provide an illustration of our method, we analyze differential expression data from an experiment on maize seedlings and contrast our results with a mixed-effects model which assumes that regression parameters follow a multivariate normal distribution.
+Section \ref{sec:data} introduces the structure of gene expression profiling data suitable for our method and recommended preprocessing steps. Section \ref{sec:model} presents our model for gene expression, which features a hierarchical model for the gene-specific parameters without parametric assumptions. Next, Section \ref{sec:inference} outlines a procedure for posterior sampling based on the blocked Gibbs sampler of \cite{ishwaran2000}. Section \ref{sec:parallel} introduces concepts related to programming for GPU parallelism and discusses details of two important parallel algorithms. The Gibbs sampler is revisited and GPU implementation details are provided. To investigate the properties of our algorithm, in Section \ref{sec:timing} we discuss a study we conducted to assess the time requirement under variable conditions. Section \ref{sec:analysis} presents an analysis of differential expression data and contrasts our results with both a gene-independent analysis and a mixed-effects analysis assuming a multivariate normal distribution on the random effects. Finally, in Section \ref{sec:discussion} we put our proposed method in context, discuss potential applications and consider future directions for research.
 % In summary, to avoid sensitivity to the prior distribution on $\mathcal{P}$, we propose to model it as a truncated Dirichlet process. Advances in computers have seen a rapid increase in the use of Markov Chain Monte Carlo (MCMC) methods for fitting sophisticated statistical models. Because such methods rely on thousands or even millions of simluated draws generated one after another, fast computing is critical to making them computationally feasible. Nonparametric Bayesian methods are no different in this regard, but when the size of the data set gets moderately large, the computational effort required per draw can be enormous as the number of parameters grows with the sample size. Graphics processing units (GPUs) have potential in this area, provided that most of the work can be divided into many parallel tasks which operate on different pieces of memory. By exploiting conditional independence in the model and making use of parallelized algorithms, we demonstrate the feasibility of nonparametric Bayesian modeling in the ``big data" setting of gene expression data.
 \section{Data}
 \label{sec:data}
@@ -60,6 +67,7 @@ $$\mbox{transformed log-count in column }i = \log (\mbox{original count in colum
 \begin{table}[ht]
 \centering
 \caption{\small Same sample of RNA-seq total read counts as in Table \ref{tab:data}, after transformation and normalization. Weighted trimmed mean of M-values normalization was performed using the \texttt{calcNormFactors} function in \texttt{edgeR} \cite{edger2010}.}
+\label{tab:data-transformed}
 \vspace{.2in}
 \begin{tabular}{ccccccccc}
   \hline
@@ -131,7 +139,7 @@ This assumption induces a stochastically decreasing ordering of the weights. Add
 
 
 \section{Model inference}
-\label{sec:mcmc}
+\label{sec:inference}
 In order to make inference with this model, we invoke Bayes' theorem, which requires the choice of prior distributions to complete a full probability model.
 
 We choose values of $m_\beta,\,C_\beta,\,a_{\sigma^2},\,b_{\sigma^2}$ to put mass on reasonable values of $\left(\beta_g^\top,\sigma^2_g\right)$. This can be though of as an empirical Bayes approach. Alternatively, one could specify priors on these parameters, adding another hierarchy to the model. In any case, choosing Q to be diffuse can be overly informative and lead to only few large $\pi_k$ accounting for most of the total probability in the mixture, $\mathcal{P}$ \citep{gelman-book}.
@@ -263,11 +271,11 @@ The full conditional for cluster location, $\tilde{\beta}_k$:
   \end{equation*}
 
 \section{Computation on the GPU}
-\label{sec:computation}
+\label{sec:parallel}
 \subsection{General Remarks}
-Modern GPUs offer hundreds or thousands of cores that can all execute a program concurrently. This is a big advantage over multi-core CPUs which typically have fewer than ten processors. If one decides to implement a program using a GPU, there are contraints that they need to be aware of.
+Modern GPUs offer hundreds or thousands of cores that can provide concurrent excecution. Compared with multi-core CPUs, which typically boast 16 or fewer processors, this suggests a large benefit to using GPUs to exploit parallelism. While these benefits are becoming more widely recognized and gaining visibility through some large software projects such as Tensorflow, as with any technology there limitations, trade-offs and can be additional complications. We now direct attention to some differences in implementation, compared to traditional CPU programming, that are required when porting code to a GPU platform.
 
-In the usual set-up, the main program in run on a CPU which turns over control periodically to the GPU to run specific tasks. These tasks, or ``kernels", follow the single instruction, multiple data (SIMD) paradigm. Each core on the GPU is assigned to work on a specific chunk of memory, but all cores execute the same program. Each instance of the program is called a ``thread". It is desirable to avoid branching logic in kernels, in part because the GPU cores are relatively slow, so branching can easily lead to high latency. The best results are obtained by having all threads proceed in lockstep.
+GPUs are usually subservient to a host CPU: the executing program is run on a CPU which turns over control periodically to the GPU to run specific tasks. These tasks, or ``kernels", follow the single instruction, multiple data (SIMD) paradigm. Each core on the GPU is assigned to work on a specific chunk of memory, but all cores execute the same program. Each instance of the program is called a ``thread". It is desirable to avoid branching logic in kernels, in part because the GPU cores are relatively slow, so branching can easily lead to high latency. The best results are obtained by having all threads proceed in lockstep.
 
 The GPU has its own memory system. Because copying memory from host (CPU) to device (GPU) and visa versa is slow, if possible, data input should be copied only once from the host CPU to GPU memory and when the task is completed, it should be copied once back only once to the CPU.
 
@@ -279,54 +287,60 @@ Threads are themselves organized into ``warps". When data is read from global me
 \label{sec:routines}
 \subsubsection{Reductions}
 \label{subsec:reduce}
-On the GPU, individual processors are slow, and asynchronous tasks can result in many idle threads. In order to achieve speed-ups, algorithms must exploit parallelism and must do so in a way that respects the limitations of the hardware. A basic example is reduction. Given some data in memory, $x_1, x_2, \ldots, x_n$, and an \textit{associative} operator $\oplus$, the problem is to compute $x_1 \oplus x_2 \oplus \ldots \oplus x_n$. 
+On the GPU, individual processors are slow, and asynchronous tasks can result in many idle threads. In order to achieve speed-ups, algorithms must exploit parallelism and must do so in a way that respects the limitations of the hardware. A basic example is reduction. Given some data in memory, $x_1, x_2, \ldots, x_n$, and an \textit{associative} operator $+$, the problem is to compute $s_n=x_1 + x_2 + \ldots + x_n$. 
 
 \begin{pseudocode}[ruled]{Reduce}{a}
 \label{upsweep}
-\COMMENT{Parallel reduction of $n=2^d$ elements (upsweep step of scan).}\\
-\FOR i \GETS 1 \TO \log_2 n \DO \BEGIN
-  \FOR j \GETS 1 \TO n \mbox{ in parallel }\DO \BEGIN
-    \IF j \mbox{ mod } 2^i \DO \BEGIN
-    a[j] \GETS a[j-2^{i-1}] \oplus a[j];\\
+\COMMENT{Parallel reduction of $n=2^D$ elements (upsweep step of cumulative `sum`).}\\
+\FOR d \GETS 1 \TO D \DO \BEGIN
+  \FOR i \GETS 1 \TO n \mbox{ in parallel }\DO \BEGIN
+    \IF i \mbox{ mod } 2^d \DO \BEGIN
+    a[i] \GETS a[i-2^{d-1}] + a[i];\\
     \END \END \END
 \RETURN{a}
 \end{pseudocode}
 
-Assuming no constraint on the number of processors, algorithm \ref{upsweep} describes a GPU-friendly way to tackle this problem. In the first iteration of the outer loop, the inner loop keeps a maximal number of threads busy with identical tasks, requiring similar and parallel memory accesses, two reads and one write. While half of these threads become idle in subsequent loops, the active threads always write to the same place. In practice, since device memory is not flat, as was discussed in the previous subsection, an optimal implementation would make use of shared memory after the first read. Reading and writing from shared memory is much faster than from global memory and is accessible to all threads in a block.
+To see why the reduce algorithm works, we consider using reduce to compute a sum of $2^D$ elements. Let $a$ an array of size $n=2^D$ ($a=(a_1,\ldots,a_n)$) containing values $v_1,\ldots,v_n$. Define $z(i)=\op{argmax}_{d\ge 0}\{i \mod_{2^d} =0\}$; or, alternatively, the number of trailing zeros when $i$ is written in binary. At the end of iteration $d$ of the outer loop, $a_{i},\,i$ in $\{j\cdot 2^d: 1 \le j \le 2^{D-d}\}$ contains the sum, $s_{i}-s_{i-2^d}$, allowing the target, $s_n$, to be computed by $\sum_{j=1}^{2^{D-d}}(s_{j\cdot 2^d}-s_{(j-1)\cdot 2^d})$. In the last iteration, the target is computed simply by adding the partial results in $a_{2^{D-1}}$ and $a_{2^{D}}$. We note here that, upon completion of the routine, $a_i$ contains a partial sum which depends on $z(i)$, namely $s_i - s_{i-2^{z(i)}}$.
+
+Assuming no constraint on the number of processors, algorithm \ref{upsweep} illustrates good GPU programming strategies. In the first iteration of the outer loop, the inner loop keeps a maximal number of threads busy with identical tasks, requiring similar and parallel memory accesses, two reads and one write. While half of these threads become idle in subsequent loops, the active threads always write to the same place. In practice, since device memory is not flat, as was discussed in the previous subsection, an optimal implementation would make use of shared memory after the first read. Reading and writing from shared memory is much faster than from global memory and is accessible to all threads in a block.
 
 % CUDA users who want to take advantage of GPU parallelism without concerning themselves with the optimization should be aware of the Thrust library \cite{thrust}. Thrust is based on the C++ Standard Template Library and provides both containers for handling allocation and deallocation of device memory as well as generic algorithms, such as \code{thrust::reduce}.
 
 
 %\caption{Parallel reduction of $n=2^d$ elements (upsweep step of scan). Upon return, total is stored in $a[n]$.}
 
-\subsubsection{Cumulative sums}
+\subsubsection{Cumulative (prefix) sums}
 \citet{blelloch1990} described a general algorithm for computing $x_1,
 x_1 \oplus x_2, \ldots, x_1 \oplus \ldots \oplus x_n$. This kind of routine is a generalization of a cumulative sum and is used in various ways in our MCMC algorithm. For example, the calculation of cumulative probabilities to sample from categorical distributions in step 1 computes the cumulative sum on the log scale for numerical stability, i.e. $\oplus=\log(e^{x_1}+e^{x_2})$.
 
-A serial version of this algorithm, $z_1 = x_1,\;z_2 = z_1 \otimes x_2,\dots$, is ill-suited to the GPU. Blelloch showed that there is an efficient parallel alternative. The simplest case is for an array with $2^d$ elements and $2^{d-1}$ processors. The algorithm is composed of two steps: a parallel reduction (``upsweep"; algorithm \ref{upsweep}), followed by a ``downsweep" (algorithm \ref{downsweep}. Given an input array $a$, the algorithm modifies the input with the result that each element contains the sum of all the previous elements in the original.
-
-The algorithm works by taking advantage of the partial results in memory after the upsweep. Let $S_c = \{1 \le j \le 2^{d}: j \mod 2^c = 0\},\; c=0,...,d$. Note that $S_0 \supset S_1 \supset \cdots \supset S_d$ and define $\tilde{S}_c = S_c \setminus S_{c+1}$. Then $\mathcal{C} = \{\tilde{S}_0,\ldots,\tilde{S}_d\}$ is a partition of $\mathcal{J}=\{1,\ldots,2^d-1\}$. The function $h: \mathcal{J} \rightarrow \mathcal{C}$ given by $h(j) = c$ such that $j \in \tilde{S}_c$ is one-to-one. Define $b$ to be the state of memory after performing the upsweep on $a$. Then $b[j] = \sum_{k=j - 2^h(j) + 1}^j a[k]$. For each $j$ in $\mathcal{J}$, it has a binary representation $c_{d-1} \ldots c_1 c_0$, e.g. for $d=3$ and $j=5$, we can write it as $0101$. Then, we can compute $\sum_{k=1}^{j} a[k]$ by $b[2^{d-1}c_{d-1}]+b[2^{d-2}c_{d-2}+2^{d-2}c_{d-2}]+\cdots+b[2^{d-1}c_{d-1}+\cdots+2^0c_{0}]$.
-Therefore,  compute $\sum_{k=1}^{j-1}$ for $j$ in $\mathcal{J}$, this can be done efficiently by $\sum_{c=\lfloor \log_2(j-1)\rfloor}^0 b[2^c]$
-
-In some cases this is the desired result; otherwise, the array is shifted to the right and the total from the upsweep is appended. In case that the number of threads is restricted, a solution is to divide the data up among the processors and perform a reduction on each subset. Next, a prescan can be performed on the processor totals, which are stored to memory. Finally, a series of scans can be performed on the subsets as desired, using the scanned processor totals as offsets \cite{blelloch1990}.
-\begin{pseudocode}[ruled]{Prescan}{a}
+\begin{pseudocode}[ruled]{CumulativeSum}{a}
 \label{downsweep}
-\COMMENT{Produce prescan of the original elements in $a$.}\\
+\COMMENT{Parallel cumulative (prefix) sum of $n=2^D$ elements.}\\
 a \GETS \CALL{Reduce}{a}\\
 a[n] \GETS 0\\
-\FOR i \GETS d \TO 1 \DO \BEGIN
-  \FOR j \GETS 1 \TO n \mbox{ in parallel }\DO \BEGIN
-    \IF j \mbox{ mod } 2^i = 2^{i-1} \DO \BEGIN
-    tmp \GETS a[j];\\
-    a[j] \GETS a[j + 2^{i-1}];\\
-    a[j + 2^{i-1}] \GETS tmp \oplus a[j + 2^{i-1}];
+\FOR d \GETS D-1 \TO 0 \DO \BEGIN
+  \FOR i \GETS 1 \TO n \mbox{ in parallel }\DO \BEGIN
+    \IF i \mbox{ mod } 2^{d+1} = 0 \DO \BEGIN
+    tmp \GETS a[j-2^{d}];\\
+    a[i-2^{d}] \GETS a[i];\\
+    a[i] \GETS tmp \oplus a[i];
     \END \END \END
 \RETURN{a}
 \end{pseudocode}
 
+A serial version of this algorithm, $z_1 = x_1,\;z_2 = z_1 \oplus x_2,\dots$, is ill-suited to the GPU. Blelloch showed that there is an efficient parallel alternative. The simplest case is for an array with $2^d$ elements and $2^{d-1}$ processors. The algorithm is composed of two steps: a parallel reduction (referred to in \cite{blelloch1990} as``upsweep"; Algorithm \ref{upsweep}), followed by a ``downsweep" (Algorithm \ref{downsweep}. Given an input array $a$, an upsweep followed by a downsweep modifies the array $a$, defined above, so that $a_i$ contains $s_{i-1}=\sum_{j=0}^{i-1}v_j$, where $v_0$ is the identity element.
 
-If $P$ processors are available
-the time required to scan $n$ elements is on the order $O(n/P + \log_2P)$, versus $O(n)$ for the serial algorithm. This is the same as the parallel reduction.
+The downsweep works with the partial results in memory after the upsweep. Picking up the example of the last subsection, define $b_{i,D}b_{i,D-1}\cdots b_{i,1}b_{i,0}$ to be the binary representation of the integer $i$. For example, if $D=4$, $i=11=01011_{2}$, with $b_{i,4}=0,\, b_{i,3}=1,\,b_{i,2}=0,\,b_{i,1}=1$ and $b_{i,0}=1$. For each $b_{i,d}=1$ in $b_i$, there is a partial sum of $2^d$ values produced in the upsweep that are used in computing $s_i$. Furthermore, the number of ones is equal to the number of partial sums needed to produce the result. For example, upon completion, $a_{12}$ will have $s_{11}=\sum_{i=1}^8 v_i + \sum_{i=9}^{10}v_i+\sum_{i=11}^{11}v_i$. 
+
+In the downsweep, at step $d$ of the outer loop, pairs of indices are formed, $i$ and $\tilde{i}$, $i>\tilde{i}$, such that $b_i$ and $b_{\tilde{i}}$ differ only in $b_{.,d}$ and both $b_{i,c}$ and $b_{\tilde{i},c}=1$ for $0\le c<d$. By construction, $i$ will have been included the previous step, while $\tilde{i}$ will have not since $b_{\tilde{i},d}=0$. Within this pairing, $a_{\tilde{i}+1}$ is set to the current value of $a_{i+1}$, i.e. the accumulation of values in the partial sums corresponding to $b_{i,D},\, \ldots, b_{i,d+1}$ while $a_{i+1}$ increments by the value in $a_{\tilde{i}+1}=s_{\tilde{i}}-s_{2^{h(\tilde{i})}}$.
+
+% Let $S_c = \{1 \le j \le 2^{d}: j \mod 2^c = 0\},\; c=0,...,d$. Note that $S_0 \supset S_1 \supset \cdots \supset S_d$ and define $\tilde{S}_c = S_c \setminus S_{c+1}$. Then $\mathcal{C} = \{\tilde{S}_0,\ldots,\tilde{S}_d\}$ is a partition of $\mathcal{J}=\{1,\ldots,2^d-1\}$. The function $h: \mathcal{J} \rightarrow \mathcal{C}$ given by $h(j) = c$ such that $j \in \tilde{S}_c$ is one-to-one. Define $b$ to be the state of memory after performing the upsweep on $a$. Then $b[j] = \sum_{k=j - 2^h(j) + 1}^j a[k]$. For each $j$ in $\mathcal{J}$, it has a binary representation $c_{d-1} \ldots c_1 c_0$, e.g. for $d=3$ and $j=5$, we can write it as $0101$. Then, we can compute $\sum_{k=1}^{j} a[k]$ by $b[2^{d-1}c_{d-1}]+b[2^{d-2}c_{d-2}+2^{d-2}c_{d-2}]+\cdots+b[2^{d-1}c_{d-1}+\cdots+2^0c_{0}]$.
+% Therefore,  compute $\sum_{k=1}^{j-1}$ for $j$ in $\mathcal{J}$, this can be done efficiently by $\sum_{c=\lfloor \log_2(j-1)\rfloor}^0 b[2^c]$
+
+If rather than $(0,s_1,\ldots,s_{n-1}$, $(s_1,s_2,\ldots,s_n)$, the first element can be dropped and the total computed in the upsweep appended. In case that the number of threads is restricted, possible modifications have been proposed. One possibility is to perform the same cumulative sum on segments of the data, saving the totals from reduction to new array. Following that, a cumulative sum can be performed on the processor totals. Finally, using the accumulated totals as offsets, cumulative sums on the segments can be performed independently (\cite{blelloch1990}).
+
+
+If $P$ processors are available, the time required to scan $n$ elements is on the order $O(n/P + \log_2P)$, versus $O(n)$ for the serial algorithm, the same as the parallel reduction.
 % Parallel scans are implemented in Thrust, called with \code{inclusive\_scan} for a full scan and \code{exclusive\_scan} for a prescan.
 %\subsubsection{Pseudo-random number generation}
 
@@ -423,7 +437,7 @@ approximation. To avoid this problem, we reorder the cluster indices by their cu
 
 \subsection{Output}
 \label{subsec:output}
-Because of the dimensionality of the problem is large, memory transfer between the CPU and GPU is slow, and memory on the GPU is limited, it is not feasible to save all of the MCMC samples. Following the approach in \citet{landau2016fully}, we preselect a small number of parameters for which we do save each iteration, but for the rest we first determine which functions of those parameters are of interest and use online algorithms that use running sums to update our estimates of those functions. Without this, we would quickly run out of memory on the GPU or lose a great deal of time due to copying substantial amounts of data each MCMC iteration. The class of estimates we calculate fall into two categories,
+Because of the dimensionality of the problem is large, it is cumbersome to save all of the MCMC samples. Following the approach in \citet{landau}, we preselect a small number of parameters for which we do save each iteration, but for the rest we first determine which functions of those parameters are of interest and use online algorithms that use running sums to update our estimates of those functions. The class of estimates we calculate fall into two categories,
 \begin{enumerate}
 \item expectations of the gene-specific parameters and their squares, i.e. $\op{E} \beta_g,\, \op{E} \beta_g^2,\, \op{E}\sigma_g,\, \op{E}\sigma_g^2$ and 
 \item gene-specific posterior probabilities of conjunctions of linear
@@ -432,9 +446,11 @@ Because of the dimensionality of the problem is large, memory transfer between t
 \end{enumerate}
 Updates of these quantities are embarrasingly parallel across $g$, so are well suited to the GPU. The update in 1) is done elementwise, based on a running sum, and the update in 2) can be decomposed into four tasks, a matrix multiplication to compute $C\beta$, an elementwise evaluation of the sign of the value, a parallel setwise reduction using the minimum to evaluate each conjunction, and finally an update of the estimator (using the same functionality as 1)).
 
+We do save and return several low-dimensional parameters which provide some information on the overall behavior of the sampler: the number of occupied clusters, the maximum id of the occupied clusters and $\alpha$, the concentration parameter.
 
 
 \section{Simulation Study}
+\label{sec:timing}
 To study the performance, we conducted a simulation study. To assess the time requirements, because time efficiency will depend both on the algorithmic implementation, that is, the raw time it takes to complete an MCMC iteration, but also on the statistical efficiency, i.e. the rate of mixing and the autocorrelation of the chain. Because it accounts for both factors, the measure we focus on is the time per effective sample. In particular, we focus on the samping for $\alpha$, both for simplicity and because it tends to reflect changes in the overall behavior of the Gibbs sampler.
 
 We work with simulated data and consider three factors: $G$, the number of genes, $K$, the truncation limit, and $p$, the dimension of $\beta_g$. For each combination of the levels of these three factors we simulated data as shown below.
@@ -489,10 +505,18 @@ G & p & 1024 & 2048 & 4096 \\
 % \label{fig:neff-marginal}
 % \end{figure}
 
-\begin{figure}
+\begin{figure}[ht]
 \centering
-\includegraphics[width=.9\textwidth]{sim-study-avgs}
-\caption[Average seconds per effective sample]{Left: Average seconds per effective sample across for two simulated datasets at each level of K, the truncation limit, G, then number of genes, and p , the dimension of regression coefficient.\\\hspace{\textwidth}Right: Predicted values from fitted model.}%
+\includegraphics[width=.9\textwidth]{raw-time2}
+\caption[Average number of seconds per MCMC sample]{Left: Average seconds required per MCMC sample across for two simulated datasets at each level of K, the truncation limit, G, then number of genes, and p , the dimension of regression coefficient. K has the largest impact on computation time, followed by G. The effect of p is small in the range considered. For large K and small G, the cost of increasing p appears to be offset by the smaller number of occupied clusters in a higher dimensional space.}%
+\label{raw-time}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=.9\textwidth]{eff-time2}
+\caption[Average seconds per effective sample]{Left: Average seconds per effective sample across for two simulated datasets at each level of K, the truncation limit, G, then number of genes, and p , the dimension of regression coefficient. Interestingly, the efficiency in sampling for $\alpha$ increases with p in our simulations. This might be explained by an increased separation between clusters, leading to greater stability in the partition defined by the allocation parameters.}%
+\label{eff-time}
 \end{figure}
 
 % latex table generated in R 3.4.1 by xtable 1.8-2 package
@@ -515,20 +539,23 @@ $2^{\beta_1}$ & 3.251 & 2.807 & 3.765 \\
 
 Table \ref{tab:regression} shows the result of fitting a linear regression of $\log_2(\frac{\mbox{seconds}}{\mbox{effective sample}}$ on $\log_2(K)$, $\log_2(G)$ and $V$. The estimated coefficients of this additive model suggest that seconds per effective sample grows sublinearly in $G$, approximately quadratic in $K$ and inversely with $V$.
 
-This last observation may seem counterintutive; however, because the posterior variability of $\alpha$ depends on the stability of the the partition of genes into clusters, and as $p$ increases so does the distance between clusters, $\alpha$, like the partition, has fewer viable moves. This phenomenon is also on display in Figure \ref{alpha-trace} where the normalized traceplots seem to show shorter and less extreme excursions in the higher dimensions.
-
-\begin{figure}
-\centering
-\includegraphics[width=.9\textwidth]{alpha-efficiency}
-\caption{Centered and scaled traceplots for $\alpha$ across levels of $p$ for various settings of $G$ and $K$.}
-\label{alpha-trace}
-\end{figure}
+\iftoggle{thesis}{
+  This last observation may seem counterintutive; however, because the posterior variability of $\alpha$ depends on the stability of the the partition of genes into clusters, and as $p$ increases so does the distance between clusters, $\alpha$, like the partition, has fewer viable moves. This phenomenon is also on display in Figure \ref{alpha-trace} where the normalized traceplots seem to show shorter and less extreme excursions in the higher dimensions.
+  
+  \begin{figure}[ht]
+  \centering
+  \includegraphics[width=.9\textwidth]{alpha-efficiency}
+  \caption{Centered and scaled traceplots for $\alpha$ across levels of $p$ for various settings of $G$ and $K$.}
+  \label{alpha-trace}
+  \end{figure}
+}
 
 \section{Example: Paschold maize data}
-\citet{paschold} produced an RNA-seq data set for gene expression of root tissue from samples, one sample from each of four young plants representing each of four maize genotypes. The genotypes were two recombinant inbred varieties, B73 and Mo17 and two crosses, B73$\times$Mo17 and Mo17$\times$B73. The plants were at an early stage where phenotypical differences between the genotypes were not yet displayed. A potentially interesting feature that RNA-seq can help address is which genes demonstrate evidence of a difference in expression between two genotypes. At present, we will consider B73 and B73$\times$Mo17.
+\label{sec:analysis}
+\citet{paschold} produced an RNA-seq data set for gene expression of root tissue from 4 samples for each of two recombinant inbred maize genotypes, B73 and Mo17. Each sample was obtained from a combination of 10 primary roots from seedlings 3.5 days after germination. Illumina's Genome Analyzer II was used for sequencing. Two flow cells were utilized, with four replicates of each genotype split across flowcells. Among the researchers' aims was to identify genes which were differentially expressed in these parental lines.
 
 \subsection{Model}
-We let $Y_{gci} = \log \frac{Z_{gci}+1}{C_{ci}}$, where $Z_{gi}$ is the total read count for replicate $i$ of genotype $c$. $C_{ci}$ is a normalizing constant which is used to adjust for differences in the total RNA content in each sample. We estimate the normalizing constants using the trimmed mean of M-values procedure \cite{robinson2010} using \code{edgeR::calcNormFactors()}. The sequencing was done using NextGen sequencing technology across two flow cells, with two replicates of each genotype split across flowcells. This allows us to estimate possible gene specific flow cell effects. Our (abbreviated) design matrix for each gene is then
+We let $Y_{gci} = \log \frac{Z_{gci}+1}{C_{ci}}$, where $Z_{gi}$ is the total read count for replicate $i$ of genotype $c$. $C_{ci}$ is a normalizing constant which is used to adjust for differences in the total RNA content in each sample. We estimate the normalizing constants using the trimmed mean of M-values procedure \cite{robinson2010}. Our design matrix for each gene (collapsing identical rows) is
 
 \begin{equation*}
 \begin{blockarray}{rlrrr}
@@ -553,7 +580,7 @@ We fit the model using four independent chains. They were initialized by setting
 \end{figure}
 
 \subsection{Comparison of methods}
-In addition to our method, we also fit the data using two other model: a linear mixed-effects model, treating gene-specific parameters as random effects, and all genes independently using least squares. For every method we parameterized the gene-specific mean by an intercept term and a half-difference term -- $\frac{1}{2}(\mbox{B73}\times\mbox{Mo17}-\mbox{B73})$. The independence model, which produces a gene-specific variance estimate borrows no information across genes. The linear mixed-effects model assumes a bivariate normal distribution for all the gene-specific mean parameters. Because the covariance and the mean of this distribution is estimatated from the data, this model does borrow information across genes (since software assumes a zero mean for the random gene effects, we also estimate a fixed effect which corresponds to the unknown mean.) This method assumes homogeneity of the error variance across genes.
+In addition to our method, we also fit the data using two other model: a linear mixed-effects model, treating gene-specific parameters as random effects, and all genes independently using least squares. For every method we parameterized the gene-specific mean with an intercept, an additive effect for the $Mo17$ genotype, and an additive effect for flow cell 2. The gene independent model, which produces a gene-specific variance estimate borrows no information across genes. The linear mixed-effects model assumes a bivariate normal distribution for all the gene-specific mean parameters. Because the covariance and the mean of this distribution is estimatated from the data, this model does borrow information across genes (since software assumes a zero mean for the random gene effects, we also estimate a fixed effect which corresponds to the unknown mean.) This method assumes homogeneity of the error variance across genes.
 
 \begin{figure}
 \centering
@@ -561,9 +588,11 @@ In addition to our method, we also fit the data using two other model: a linear 
 \caption{Comparisons of the parameter estimates under each method.}
 \label{method-compare}
 \end{figure}
-Figure  \ref{method-compare} shows a comparison of the estimates under these two models. While there is agreement about the gene-specific intercepts in the two models, there is noticable shrinkage toward the global mean for the half-difference in the linear mixed-effects model. This can be explained by the long tail of these estimates relative to a normal distribution.
+Figure  \ref{method-compare} shows a comparison of the estimates under three models. While there is agreement about the gene-specific intercepts, there is noticable shrinkage toward the global mean for the half-difference in the linear mixed-effects model. This can be explained by the long tail of these estimates relative to a normal distribution.
 
-\begin{figure}
+Figures \ref{pairs-3-methods} and \ref{diff-hist} show slices in two dimensions of the joint distribution of point estimates provided by the three models, and differences of these empirical densities. Figure \ref{diff-hist} reveals a key distinction between BNP and LMM, that the shrinkage under LMM is monotonic toward a single point, whereas BNP shrinks estimates in different ways depending on their general location in the parameter space. This is most clearly illustrated by the third row, which compares the bivariate densities of point estimates of $(\beta_{g2},\beta_{g3})$ under the different models. The estimates obtained by BNP are shrunken toward two perpendicular line segments which follow the center of the distribution of the OLS estimates. The normality assumption of LMM leads to the points along the vertical axis being all shrunk monotonically toward the origin. The bottom-left plot in figure \ref{diff-hist} shows that estimates of $\sigma_g$ are clearly shrunken toward a curve which can be interpreted as an estimate of a latent mean-variance trend across genes. This is significant, as compensating for such a trend is a recognized objective in the analysis of RNA-seq data.
+
+\begin{figure}[ht]
 \centering
 \includegraphics[width=.9\textwidth]{pairs-3-methods-std}
 \caption{Histogram of point estimates across genes, showing pairwise comparisons, using hexagonal binning. Relative to the independent estimates obtained by least-squares ("OLS"), the linear mixed-effects model ("LMM") shrinks all estimates toward a common mean, while the Bayesian nonparametric model shrinks estimates toward an underlying distribution learned from the data.}
@@ -572,14 +601,19 @@ Figure  \ref{method-compare} shows a comparison of the estimates under these two
 
 Figure \ref{pairs-3-methods} displays pairs of parameter estimates obtained from the different methods. The top two rows shows slight differences in the joint distribution of the gene-specific mean parameters for OLS when compared with those obtained by LMM. This difference is characterized by a shrinkage of all estimates toward the overall average, which has most noticable impact on the genes which are estimated to be far from that average.
 
-\begin{figure}
+\begin{figure}[ht]
 \centering
 \includegraphics[width=.65\textwidth]{mean-variance}
-\caption{Histogram of point estimates across genes, showing pairwise comparisons, using hexagonal binning. Relative to the independent estimates obtained by least-squares ("OLS"), the Bayesian nonparametric model shrinks estimates toward an underlying distribution learned from the data.}
+\caption{Bivariate histogram of point estimates across genes, using hexagonal binning. Relative to the independent estimates obtained by least-squares ("OLS"), the Bayesian nonparametric model shrinks estimates toward an underlying distribution learned from the data.}
 \label{mean-variance}
 \end{figure}
 
-
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{difference_histograms}
+\caption{Difference of histograms of point estimates for gene-specific parameters under different models. Both BNP and LMM show shrinkage toward zero relative to OLS. The shrinkage with LMM is monotonic toward zero, while the shrinkage with BNP varies across the parameter space.}
+\label{diff-hist}
+\end{figure}
 
 
 % Of particular interest was the identification of genes where the mean hybrid expression is higher or lower than that of both parents. For each gene, a reduced version of the design matrix (collapsing identical rows) is
@@ -615,8 +649,10 @@ Figure \ref{pairs-3-methods} displays pairs of parameter estimates obtained from
 % \end{figure}
 
 \section{Discussion}
-Summarise the contribution of this paper. May want to discuss possible extensions, such as changing the data model, adding label-switching moves, etc.
+\label{sec:discussion}
+Although quite computationally intensive, nonparametric Bayesian methods are becoming computationally feasible in applications, even for fairly sizable datasets, such as gene expression profiling. One way to achieve computational feasibility is through adapting existing procedures to take advantage of massively parallel systems like the GPU.
 
+We have found some evidence that our proposed procedure scales well with the size of the data ($G$), as well as the dimension of the problem ($V$), and is approximately quadratic in the number of clusters required to approximate the latent infinite mixture ($K$).
 
 \appendix
 \section{CUDA libraries}
@@ -634,14 +670,11 @@ There are several libraries that make implementing these algorithms easier in CU
   design.
 
 \item \code{thrust::reduce/reduce\_by\_key}: As described in section
-  \ref{sec:computation}, both reduce and scan are defined for any associative binary operators. Reduce by key accepts a key argument and a compatible binary predicate that identifies changes in the key. For example, for the binary predicate \code{x == y}, the key \code{\{1,1,1,2,2,1\}} would have the result be three quantities, the reductions of the first three values, the next two and the last, respectively.
+  \ref{sec:parallel}, both reduce and cumulative sum are defined for any associative binary operators. Reduce by key accepts a key argument and a compatible binary predicate that identifies changes in the key. For example, for the binary predicate \code{x == y}, the key \code{\{1,1,1,2,2,1\}} would have the result be three quantities, the reductions of the first three values, the next two and the last, respectively.
 
 \item \code{thrust::inclusive/exclusive\_scan/scan\_by\_key}: Thrust
-  offers multiple versions of the scan algorithm. The ``exclusive''
-  version is a prescan, where the first element in the result is
-  always the identity element, and the ``inclusive'' version is a full
-  scan, with the last element being equal to the result of a reduction
-  of the elements in the vector.
+  offers multiple versions of scan, which is another term for cumulative sum. The exclusive
+  version results in the array element, $a_i$, containing the sum $s_{i-1}$ (excluding the value $v_i$, while the inclusive version leaves $a_i$ containing $s_i$.
 \end{itemize}
 
 For linear algebra on the GPU, standard installations of CUDA also

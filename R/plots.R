@@ -2,9 +2,9 @@ library(dplyr)
 library(lme4)
 library(ggplot2)
 
-load("data/lmm_fit.RData")
-load("data/ind_est.RData")
-load("data/my_dat_wide.RData")
+load("data/lmm_fit_std.RData")
+load("data/ind-est-std.RData")
+load("data/my_dat_wide_std.RData")
 
 ols <- data.frame(t(ind_est$beta))
 names(ols) <- c("intercept","halfdiff","flow_cell")
@@ -192,3 +192,21 @@ volc.df <- data.frame(effect = bnp.fit$summaries$means_betas[2,],
 ggplot(volc.df, aes(effect,probs)) + geom_hex(bins=50) +
   scale_fill_continuous(trans="log",breaks=c(1,10,100,1000),low="white", high = "darkblue")+
   geom_vline(xintercept=0, linetype=2) + theme_bw()
+
+
+#ind-est-pairs
+library(GGally)
+my_theme <- theme_bw(base_size=12) + theme(panel.grid = element_blank())
+my_hex <- function(data, mapping, ...){
+  ggplot(data, mapping) + geom_hex(bins=30) + my_theme +
+    scale_fill_continuous(trans="log",high="darkblue",low="white")
+}
+my_density <- function(data, mapping, ...){
+  ggplot(data, mapping) + geom_density(fill="blueviolet",color="blueviolet")+
+    my_theme
+}
+
+ols$sigma <- sqrt(ind_est$sigma2-.1)
+ggpairs(ols[,-4], lower=list(continuous=my_hex),
+        upper=list(continuous=my_hex),
+        diag=list(continuous=my_density))
