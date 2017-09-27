@@ -287,7 +287,7 @@ Threads are themselves organized into ``warps". When data is read from global me
 \label{sec:routines}
 \subsubsection{Reductions}
 \label{subsec:reduce}
-On the GPU, individual processors are slow, and asynchronous tasks can result in many idle threads. In order to achieve speed-ups, algorithms must exploit parallelism and must do so in a way that respects the limitations of the hardware. A basic example is reduction. Given some data in memory, $x_1, x_2, \ldots, x_n$, and an \textit{associative} operator $+$, the problem is to compute $s_n=x_1 + x_2 + \ldots + x_n$. 
+On the GPU, individual processors are slow, and asynchronous tasks can result in many idle threads. In order to achieve speed-ups, algorithms must exploit parallelism and must do so in a way that respects the limitations of the hardware. A basic example is reduction. Given some data in memory, $v_1, v_2, \ldots, v_n$, and an \textit{associative} operator $+$, the problem is to compute $s_n=v_1 + v_2 + \ldots + v_n$. 
 
 \begin{pseudocode}[ruled]{Reduce}{a}
 \label{upsweep}
@@ -310,8 +310,8 @@ Assuming no constraint on the number of processors, algorithm \ref{upsweep} illu
 %\caption{Parallel reduction of $n=2^d$ elements (upsweep step of scan). Upon return, total is stored in $a[n]$.}
 
 \subsubsection{Cumulative (prefix) sums}
-\citet{blelloch1990} described a general algorithm for computing $x_1,
-x_1 \oplus x_2, \ldots, x_1 \oplus \ldots \oplus x_n$. This kind of routine is a generalization of a cumulative sum and is used in various ways in our MCMC algorithm. For example, the calculation of cumulative probabilities to sample from categorical distributions in step 1 computes the cumulative sum on the log scale for numerical stability, i.e. $\oplus=\log(e^{x_1}+e^{x_2})$.
+\citet{blelloch1990} described a general algorithm for computing $v_1,
+v_1 \oplus v_2, \ldots, v_1 \oplus \ldots \oplus v_n$. This kind of routine is a generalization of a cumulative sum and is used in various ways in our MCMC algorithm. For example, the calculation of cumulative probabilities to sample from categorical distributions in step 1 computes the cumulative sum on the log scale for numerical stability, i.e. $\oplus=\log(e^{v_1}+e^{v_2})$.
 
 \begin{pseudocode}[ruled]{CumulativeSum}{a}
 \label{downsweep}
@@ -328,7 +328,7 @@ a[n] \GETS 0\\
 \RETURN{a}
 \end{pseudocode}
 
-A serial version of this algorithm, $z_1 = x_1,\;z_2 = z_1 \oplus x_2,\dots$, is ill-suited to the GPU. Blelloch showed that there is an efficient parallel alternative. The simplest case is for an array with $2^d$ elements and $2^{d-1}$ processors. The algorithm is composed of two steps: a parallel reduction (referred to in \cite{blelloch1990} as``upsweep"; Algorithm \ref{upsweep}), followed by a ``downsweep" (Algorithm \ref{downsweep}. Given an input array $a$, an upsweep followed by a downsweep modifies the array $a$, defined above, so that $a_i$ contains $s_{i-1}=\sum_{j=0}^{i-1}v_j$, where $v_0$ is the identity element.
+A serial version of this algorithm, $z_1 = v_1,\;z_2 = z_1 \oplus v_2,\dots$, is ill-suited to the GPU. Blelloch showed that there is an efficient parallel alternative. The simplest case is for an array with $2^d$ elements and $2^{d-1}$ processors. The algorithm is composed of two steps: a parallel reduction (referred to in \cite{blelloch1990} as``upsweep"; Algorithm \ref{upsweep}), followed by a ``downsweep" (Algorithm \ref{downsweep}). Given an input array $a$, an upsweep followed by a downsweep modifies the array $a$, defined above, so that $a_i$ contains $s_{i-1}=\sum_{j=0}^{i-1}v_j$, where $v_0$ is the identity element.
 
 The downsweep works with the partial results in memory after the upsweep. Picking up the example of the last subsection, define $b_{i,D}b_{i,D-1}\cdots b_{i,1}b_{i,0}$ to be the binary representation of the integer $i$. For example, if $D=4$, $i=11=01011_{2}$, with $b_{i,4}=0,\, b_{i,3}=1,\,b_{i,2}=0,\,b_{i,1}=1$ and $b_{i,0}=1$. For each $b_{i,d}=1$ in $b_i$, there is a partial sum of $2^d$ values produced in the upsweep that are used in computing $s_i$. Furthermore, the number of ones is equal to the number of partial sums needed to produce the result. For example, upon completion, $a_{12}$ will have $s_{11}=\sum_{i=1}^8 v_i + \sum_{i=9}^{10}v_i+\sum_{i=11}^{11}v_i$. 
 
@@ -522,7 +522,7 @@ G & p & 1024 & 2048 & 4096 \\
 % latex table generated in R 3.4.1 by xtable 1.8-2 package
 % Wed Sep 06 08:56:57 2017
 \begin{table}[ht]
-\caption[Estimated exponentiated coefficients for the linear regression model: (model)]{Estimated exponentiatedcoefficients for the linear regression model: \\\hspace{\textwidth}\(\log_2$(sec. per eff. sample)$=\beta_0 + \log_2(K)\beta_1 + \log_2(G)\beta_2 + \log_2(V)\beta_3 + \epsilon\). The exponentiated values are a multiplicative effect on the predicted median seconds per effective sample for each doubling in the corresponding predictor (K,G or V).}
+\caption[Estimated exponentiated coefficients for the linear regression model: (model)]{Estimated exponentiatedcoefficients for the linear regression model: \\\hspace{\textwidth}\(\log_2$(sec. per eff. sample)$=\beta_0 + \log_2(K)\beta_1 + \log_2(G)\beta_2 + \log_2(p)\beta_3 + \epsilon\). The exponentiated values are a multiplicative effect on the predicted median seconds per effective sample for each doubling in the corresponding predictor (K,G or p).}
 %   Estimated coefficients for the linear regression model,.}
 \label{tab:regression}
 \centering
@@ -537,10 +537,10 @@ $2^{\beta_1}$ & 3.251 & 2.807 & 3.765 \\
 \end{tabular}
 \end{table}
 
-Table \ref{tab:regression} shows the result of fitting a linear regression of $\log_2(\frac{\mbox{seconds}}{\mbox{effective sample}}$ on $\log_2(K)$, $\log_2(G)$ and $V$. The estimated coefficients of this additive model suggest that seconds per effective sample grows sublinearly in $G$, approximately quadratic in $K$ and inversely with $V$.
+Table \ref{tab:regression} shows the result of fitting a linear regression of $\log_2(\frac{\mbox{seconds}}{\mbox{effective sample}}$ on $\log_2(K)$, $\log_2(G)$ and $\log_2(p)$. The estimated coefficients of this additive model suggest that seconds per effective sample grows sublinearly in $G$, approximately quadratic in $K$ and inversely with $V$.
 
 \iftoggle{thesis}{
-  This last observation may seem counterintutive; however, because the posterior variability of $\alpha$ depends on the stability of the the partition of genes into clusters, and as $p$ increases so does the distance between clusters, $\alpha$, like the partition, has fewer viable moves. This phenomenon is also on display in Figure \ref{alpha-trace} where the normalized traceplots seem to show shorter and less extreme excursions in the higher dimensions.
+  An inverse relationship between computation time and the dimension, $p$, may seem counterintutive; however, because the posterior variability of $\alpha$ depends on the stability of the the partition of genes into clusters, and as $p$ increases so does the distance between clusters, $\alpha$, like the partition, has fewer viable moves. This phenomenon is also on display in Figure \ref{alpha-trace} where the normalized traceplots seem to show shorter and less extreme excursions in the higher dimensions.
   
   \begin{figure}[ht]
   \centering
