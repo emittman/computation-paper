@@ -34,10 +34,12 @@
     
     \if0\blind
   {
-    \title{\bf A Bayesian nonparametric approach to the analysis of gene expression profiling experiments}
-    \author{Eric Mittman\thanks{
-      The author gratefully acknowledges the comments and input of Dr. Jarad Niemi on this project.}\hspace{.2cm}\\
-      Department of Statistics, Iowa State University}
+    \title{\bf A Bayesian nonparametric approach for component-wise inference for high-dimensional data}
+    \author{Eric Mittman\thanks{Department of Statistics, Iowa State University}\\
+    and\\
+    Jarad Niemi\footnotemark[1]}
+      
+      
     \maketitle
   } \fi
   
@@ -47,18 +49,18 @@
     \bigskip
     \bigskip
     \begin{center}
-    {\LARGE\bf A Bayesian nonparametric approach for gene expression profiling analysis}
+    {\LARGE\bf A Bayesian nonparametric approach for component-wise inference for high-dimensional data}
     \end{center}
     \medskip
   } \fi
   
   \bigskip
   \begin{abstract}
-  Abstrct.
+  In high-dimensional settings where traditional shrinkage priors are commonly applied, we consider an alternative nonparametric Bayesian approach based on a Dirichlet process mixture. This highly-flexible approach "learns" the latent distribution of the random effects to allow for efficient shrinkage toward that distribution. In order to make our approach computationally feasible, we take advantage of the massively parallel architecture of the GPU. We discuss the details of the model and specifics of our implementation of the Gibbs sampler. We use gene expression profiling experiments as a motivating example. Through simulations we study the how the computational time requirements scale with the data. We illustrate our method with a differential expression analysis on a blocked RNA-seq experiment.
   \end{abstract}
   
   \noindent%
-  {\it Keywords:}  Bayesian nonparametrics, GPU, gene expression 
+  {\it Keywords:}  Bayesian nonparametrics, GPU, high-dimensional, gene expression, Dirichlet process, Gibbs
   
   \spacingset{1.45}
   
