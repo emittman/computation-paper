@@ -13,7 +13,7 @@ When similar comparisons are to be made between subjects for each measurement co
 A common approach is to model component-specific parameters as independent, identically distributed according to some probability distribution, $\mathcal{P}$, belonging to a parametric family of distributions. Under this framework, $\mathcal{P}$ can then be estimated allowing for conditional inference, or a prior distribution can be given on its parameters allowing for fully Bayesian inference. While this approach can be useful in practice, the influence of the choice of a particular parametric family can be considerable. This choice is often not reflective of \textit{a priori} information, but rather due to convention or convenience. Here, the choice of a `nonparametric prior', i.e. a prior distribution over a `large' set of probability distributions, allows one to avoid having to make parameteric assumptions about $\mathcal{P}$. 
 % The most widely used such prior distribution in the literature of Bayesian nonparametrics is the Dirichlet process (DP).
 
-Much effort has gone into researching methods in the case of gene expression. Several have been released as R packages \citep{edger2010,deseq2014,voom}. A common feature of these methods is that they use between-gene information to estimate the the  mean-variance relationship nonparametrically. This relationship can be key to acheiving statistical power; it involves both biological and technological sources of variation and varies from dataset to dataset\cite{voom}. Empirically, we have observed structure to be present not only between the mean and variance, but also among regression parameter components (see Fig. \ref{pairs-ind-est}). This suggests that between-gene information is available not only to regulate gene-level assessment of variance, but also the estimated effects themselves. While others used random effects models for individual regression components \citep{deseq2014,landau}], they depend on assumptions about the underlying distribution of effects, such as independence, which are contradicted by the data.
+Much effort has gone into researching methods in the case of gene expression. Several have been released as R packages \citep{edger2010,deseq2014,voom}. A common feature of these methods is that they use between-gene information to estimate the the  mean-variance relationship nonparametrically. This relationship can be key to acheiving statistical power; it involves both biological and technological sources of variation and varies from dataset to dataset \citep{voom}. Empirically, we have observed structure to be present not only between the mean and variance, but also among regression parameter components (see Fig. \ref{pairs-ind-est}). This suggests that between-gene information is available not only to regulate gene-level assessment of variance, but also the estimated effects themselves. While others used random effects models for individual regression components \citep{deseq2014,landau}], they depend on assumptions about the underlying distribution of effects, such as independence, which are contradicted by the data.
 
 \begin{figure}[ht]
 \centering
@@ -33,7 +33,9 @@ Section \ref{sec:data} introduces the structure of gene expression profiling dat
 % In summary, to avoid sensitivity to the prior distribution on $\mathcal{P}$, we propose to model it as a truncated Dirichlet process. Advances in computers have seen a rapid increase in the use of Markov Chain Monte Carlo (MCMC) methods for fitting sophisticated statistical models. Because such methods rely on thousands or even millions of simluated draws generated one after another, fast computing is critical to making them computationally feasible. Nonparametric Bayesian methods are no different in this regard, but when the size of the data set gets moderately large, the computational effort required per draw can be enormous as the number of parameters grows with the sample size. Graphics processing units (GPUs) have potential in this area, provided that most of the work can be divided into many parallel tasks which operate on different pieces of memory. By exploiting conditional independence in the model and making use of parallelized algorithms, we demonstrate the feasibility of nonparametric Bayesian modeling in the ``big data" setting of gene expression data.
 \section{Data}
 \label{sec:data}
-We consider data that can be represented in a tabular format, with rows corresponding to measurement components and columns to experimental/observational units (for an abbreviated example, see table \ref{tab:data}). Data meeting this requirement include RNA-seq read counts and microarray data. Relevant metadata for the samples include information about groupings, either due to experimental treatment, technical design or natural biological groupings by population. Metadata for the genes themselves, while of great importance to the biologist, are not used by our method.
+We consider data that can be represented in a tabular format, with rows corresponding to measurement components and columns to experimental/observational units (for an abbreviated example, see table \ref{tab:data}). Important examples include RNA-seq read counts and microarray data. Relevant metadata for the samples include information about groupings, either due to experimental treatment, technical design or natural biological groupings by population. Metadata for the genes themselves, while important to the biologist, are not used by our method.
+
+%TODO: Choose interesting genes
 
 % latex table generated in R 3.4.1 by xtable 1.8-2 package
 % Thu Aug 31 13:00:59 2017
@@ -55,15 +57,8 @@ $\vdots$ &    &    &    &  $\vdots$   &   &   &   &  $\vdots$ \\
 \end{tabular}
 \end{table}
 
-\paragraph{Normalization} For various technical reasons, normalization of the table columns (`between-sample' normalization) is needed to adjust for systematic differences arising from technical factors unrelated to the quantities of interest.
-
-For example, in RNA-seq experiments, the total of all read counts (`library size') for a sample will vary, in part, due to differences in sequencing depth. A simple adjustment for library size is to convert total read counts to a relative proportion, such as counts per million (cpm). A criticism of this approach to normalization is that the library size may be driven primarily by a few highly sequenced genes, making this approach too volatile. More robust approaches have been proposed; for further discussion, see \citet{oshlack2010rna}.
-
-\paragraph{Transformation} Because the data are non-negative and variability in expression tends to increase with the overall expression,  gene expression data is typically analyzed on a logarithmic scale, with difference in expression being multiplicative. The large number of zero counts usually present in RNA-seq data, preclude taking logarithms of the raw data. Using a generalized linear modeling approach avoids this problem by specifying a discrete probability model for the counts, while the log-mean expression is modeled as a linear function of the model parameters.
-
-For computational reasons, we assume a normal model for the data after transforming it. First, we compute normalization factor $c_i$ for each column; second, we take logarithms of the data, after adding 1, and apply the normalization on the log scale, .i.e.
-$$\mbox{transformed log-count in column }i = \log (\mbox{original count in column }i+1) + \log(c_i)$$. The result after applying these steps to the data in Table \ref{tab:data} are shown in Table \ref{tab:data-transformed}.
-
+\iftoggle{thesis}{%
+Because the read count totals are left-skewed, we use a logarithmic transformation of the RNA-seq counts, performing the analysis instead with log-counts per million (log-cpm). The details are given in Section \ref{sec:analysis}. Table \ref{tab:data-transformed} shows the result of this transformation applied to the data in Table \ref{tab:data}.
 % latex table generated in R 3.4.1 by xtable 1.8-2 package
 % Thu Aug 31 14:28:27 2017
 \begin{table}[ht]
@@ -83,12 +78,13 @@ $\vdots$ &  &  &  & $\vdots$ &  & &  & $\vdots$ \\
    \hline
 \end{tabular}
 \end{table}
+}{}
 
 \section{Bayesian nonparametric hierarchical regression model}
 \label{sec:model}
-Let $Y_{gi}$ represent the observed expression (possibly after transformation) for gene $g$, sample $n$. Let $x_{n}^\top$ be the row of the design matrix $X$ corresponding to sample $n$. We will use the upper case letters $G$ and $N$, to denote the number of genes and samples, respectively. In addition, we accommodate possible observation-level weights, $w_{gn}$. For the observed data, we assume the data model
+Let $y_{gn}$ represent the observed expression (possibly after transformation) for gene $g$, sample $n$. Let $x_{n}^\top$ be the row of the design matrix $X$ corresponding to sample $n$. We will use the upper case letters $G$ and $N$, to denote the number of genes and samples, respectively. In addition, we accommodate possible observation-level weights, $w_{gn}$. For the observed data, we assume the data model
 \begin{equation*}
-Y_{gn} \ind \op{N} \left( x_{n}^\top \beta_g, \frac{\sigma^2_g}{w_{gn}} \right),
+y_{gn} \ind \op{N} \left( x_{n}^\top \beta_g, \sigma^2_g \right),
 \end{equation*}
 We model jointly
 
@@ -108,41 +104,46 @@ As shown by \citet{sethuraman}, it follows from the definition of the Dirichlet 
 
 Let 
 \begin{equation}
-\mathcal{P} =\sum_{k=1}^\infty \pi_k \delta_{\left(\tilde{\beta}_k^\top ,\tilde{\sigma}^2_k\right)}.
+\mathcal{P} =\sum_{k=1}^\infty \pi_k \delta_{\left(\tilde{\beta}_k^\top ,\tilde{\sigma}^2_k\right)},
 \end{equation}
-Here $\delta_{(.)}$ is the Dirac delta function. Note that although almost sure discreteness is a property applicable to ``draws'' from a DP, the posterior for $\mathcal{P}$ is in fact a mixture of DP \citep{antoniak}. An implication of discretness can be thought of as a ``bet on sparsity"; that there are actually a finite (but unspecified) number of unique values that $(\beta_g^\top,\sigma^2_g)$ can take.  
+where $\delta_{(.)}$ is the Dirac delta function. Note that although almost sure discreteness is a property applicable to ``draws'' from a DP, the posterior for $\mathcal{P}$ is in fact a mixture of DP \citep{antoniak}. An implication of discretness can be thought of as a ``bet on sparsity"; that there are actually a finite (but unspecified) number of unique values that $(\beta_g^\top,\sigma^2_g)$ can take.  
  The ``atoms" distributed according to $Q$, specified by the product measure
 
 \begin{equation}
-\tilde{\beta}_k \sim \op{N}(m_\beta, C_\beta),\quad \tilde{\sigma}^2_k \sim \op{IG}(a_{\sigma^2}, b_{\sigma^2}).
+\tilde{\beta}_k \ind \op{N}(m_\beta, C_\beta),\quad \tilde{\sigma}^2_k \ind \op{IG}(a_{\sigma^2}, b_{\sigma^2}),
+\label{eq:Q}
 \end{equation}
-
-``$\op{IG}(a,b)$" refers to the inverse gamma distribution which we parameterize by shape and scale parameters, $a$ and $b$ with density given by
+where ``$\op{IG}(a,b)$" refers to the inverse gamma distribution which we parameterize by shape and scale parameters, $a$ and $b$ with density given by%
+\iftoggle{thesis}{
 \begin{equation*}
 p(x|a,b) = \frac{b^a}{\Gamma(a)}x^{a+1}e^{-b/x}.
 \end{equation*}
-
-
-The mixture weights, $\pi_k$,  follow a stick-breaking process \cite{sethuraman}. Using the reparameterization,
-
+}{
+ $p(x|a,b) = \frac{b^a}{\Gamma(a)}x^{a+1}e^{-b/x}$.
+}%
+The mixture weights, $\pi_k$,  follow a stick-breaking process \cite{sethuraman}. Under this reparameterization,
+\iftoggle{thesis}{
 \begin{equation}
 \nu_k = \frac{\pi_k}{1 - \sum_{l=1}^{k-1} \pi_l},
 \end{equation}
-
-$\nu_k$ representing a proportion of the total probability remaining after $k-1$ breaks. For the stick-breaking construction of the DP, the $\nu_k$ are modeled by:
+}{%
+$\nu_k = \frac{\pi_k}{1 - \sum_{l=1}^{k-1} \pi_l}$,%
+}%
+where $\nu_k$ represents the weight for cluster $k$ relative to the total probability remaining after $k-1$ breaks. For the stick-breaking construction of the DP, the $\nu_k$ are modeled by:
+\iftoggle{thesis}{%
 \begin{equation}
 \nu_k \ind \op{Beta}(1, \alpha).
 \end{equation}
-
-This assumption induces a stochastically decreasing ordering of the weights. Additionally, note that $\sum_{k=1}^K \pi_k \stackrel{p}{\rightarrow} 1$ as $K\rightarrow \infty$. 
+}{$\nu_k \ind \op{Beta}(1, \alpha)$.}
+This assumption induces a stochastically decreasing ordering of the weights, so that $\sum_{k=1}^K \pi_k \stackrel{p}{\rightarrow} 1$ as $K\rightarrow \infty$. These facts suggest that the infinite mixture distribution, $\mathcal{P}$ can be well approximated by a finite mixture. We return to this idea in Section {\ref{sec:inference}. 
 
 
 
 \section{Model inference}
 \label{sec:inference}
-In order to make inference with this model, we invoke Bayes' theorem, which requires the choice of prior distributions to complete a full probability model.
+We adopt a Bayesian approach for estimation and inference for the DP mixture model described in Section \ref{sec:model}. This requires a specification the completion of a full probability model by specifying prior distributions. Looking at Figure \ref{dag}, which shows the directed acyclical graphs representing the model, specifying a prior amounts to choosing values for model parameters which have no arrows pointing toward them, i.e. whose distribution is not otherwise specified in the model.
 
-We choose values of $m_\beta,\,C_\beta,\,a_{\sigma^2},\,b_{\sigma^2}$ to put mass on reasonable values of $\left(\beta_g^\top,\sigma^2_g\right)$. This can be though of as an empirical Bayes approach. Alternatively, one could specify priors on these parameters, adding another hierarchy to the model. In any case, choosing Q to be diffuse can be overly informative and lead to only few large $\pi_k$ accounting for most of the total probability in the mixture, $\mathcal{P}$ \citep{gelman-book}.
+We choose values of $m_\beta,\,C_\beta,\,a_{\sigma^2},\,b_{\sigma^2}$ so that $Q$ puts mass on reasonable values of the $p+1$ dimensional parameters $\left(\tilde{\beta}_g^\top,\tilde{\sigma}^2_g\right)$. This can be though of as an empirical Bayes approach. Alternatively, one could also select values based on prior experience. In any case, using informative or weakly informative priors for is important; if $Q$ is chose to be diffuse, that can be overly informative and lead to only few large $\pi_k$ accounting for most of the total probability in the mixture, $\mathcal{P}$ \citep{gelman-book}.
 
 The parameter $\alpha$ plays an important role in the model, since it helps to determine how quickly the successive elements of $\pi$ decay, i.e. the number of clusters selected by the model. For computational convenience, we choose the conditionally conjugate prior
 
@@ -171,10 +172,10 @@ In that paper, the authors use a table of values derived from this formula to de
 \label{dag}
 \end{figure}
 
-Panels (a) and (b) in Figure \ref{dag} shows a graphical two representations of the model. As explained in \cite{neal2000}, while sampling methods based on $a)$ exist, it is more efficient to decouple the process partitioning the $(\beta_g,\sigma_g)$ into clusters from the process providing the unique values, $Q$. This is done by introducing a latent variable, $\zeta_g$, taking values on the positive integers with the discrete distribution given by $Pr(\zeta_g=k)=\pi_k$. These latent variables generate a random partition of the `genes' into groups, with $(\beta_g,\sigma^2_g)=(\tilde{\beta}_k,\tilde{\sigma^2}_k)$ for all $g$ where $\zeta_g=k$. The expanded form of the model is shown in $b)$.
+Panels (a) and (b) in Figure \ref{dag} show two graphical representations of the model. As explained in \cite{neal2000}, while sampling methods based on $a)$ exist, it is more efficient to decouple the process partitioning the $(\beta_g,\sigma_g)$ into clusters whose locations are realizations from the base measure, $Q$. This is done by introducing a latent variable, $\zeta_g$, taking values on the positive integers with the discrete distribution given by $Pr(\zeta_g=k)=\pi_k$. These latent variables generate a random partition of the `genes' into groups, with $(\beta_g,\sigma^2_g)=(\tilde{\beta}_k,\tilde{\sigma^2}_k)$ for all $g$ where $\zeta_g=k$. The expanded form of the model is shown in $b)$.
 
 Our Gibbs sampler is based on that proposed by \citet{ishwaran2000}. In contrast to prior approaches to MCMC, detailed in \citet{neal2000}, which can be classified as ``marginal" methods, Ishwaran and Zarepour presented their ``blocked" Gibbs sampler which allows approximate inference for DPM models. Unlike the marginal Gibbs samplers, which update the cluster allocation for each
-`gene', conditional on all other allocations, the blocked sampler jointly updates all cluster allocations independently. Being able to do so is advantageous when $G$ is large, since it becomes possible to do a large portion of the necessary computation using many concurrent processes. As we can see from Figure \ref{dag}, $\zeta_g$ are conditionally independent given $\mathcal{P}$. This is problematic since $\mathcal{P}=\sum_{k=1}^\infty \pi_k \delta_{(\beta_k,\sigma^2_k)}$ is an infinite mixture. \cite{ishwaran2001} showed that, due to the stochastic ordering of the $\pi_k$, $\mathcal{P}$ can be well-approximated by $\mathcal{P}_K=\sum_{k=1}^K \pi^*_k \delta_{(\beta_k,\sigma^2_k)}$, letting $\pi_k^*=\pi_k$ for $k<K$ and $\pi_K^* = 1-\sum_{k=1}^{K-1} \pi_k$. The authors provide an approximate lower bound to the $L_1$ distance between $\mathcal{P}_K$ and $\mathcal{P}$ as a function of $G$, $K$ and $\alpha$ and argue that because the bound decreases exponentially with $K$, it should be possible in practice to use a hierarchical model based on $\mathcal{P}_K$ that is virtually indistinguishable from one based on $\mathcal{P}$.
+`gene', conditional on all other allocations, the blocked sampler jointly updates all cluster allocations independently. Being able to do so is advantageous when $G$ is large, since it becomes possible to do a large portion of the necessary computation using many parallel processes which can be executed concurrently. As we can see from Figure \ref{dag}, $\zeta_g$ are conditionally independent given $\mathcal{P}$. This is problematic since $\mathcal{P}=\sum_{k=1}^\infty \pi_k \delta_{(\beta_k,\sigma^2_k)}$ is an infinite mixture. \cite{ishwaran2001} showed that, due to the stochastic ordering of the $\pi_k$, $\mathcal{P}$ can be well-approximated by $\mathcal{P}_K=\sum_{k=1}^K \pi^*_k \delta_{(\beta_k,\sigma^2_k)}$, letting $\pi_k^*=\pi_k$ for $k<K$ and $\pi_K^* = 1-\sum_{k=1}^{K-1} \pi_k$. The authors provide an approximate lower bound to the $L_1$ distance between $\mathcal{P}_K$ and $\mathcal{P}$ as a function of $G$, $K$ and $\alpha$ and argue that because the bound decreases exponentially with $K$, it should be possible in practice to use a hierarchical model based on $\mathcal{P}_K$ that is virtually indistinguishable from one based on $\mathcal{P}$.
 
 Applying this truncation in our model is acheived by setting $\nu_K=1$. We then have
 
@@ -195,18 +196,18 @@ Applying Bayes' theorem, the posterior distribution, up to a constant, is
 p(\beta,\sigma^2,\mathcal{P},\alpha|y) = p(\zeta, \tilde{\beta},\tilde{\sigma^2},\nu,\alpha | y) \propto p(y|\tilde{\beta},\tilde{\sigma^2},\zeta) p(\zeta|\nu) p(\nu|\alpha)p(\tilde{\beta},\tilde{\sigma^2})
 \end{equation*}
 \begin{equation*}
-= \prod_{g=1}^G \left\{ \op{N}(y_g;\,\beta_{\zeta_g},\sigma^2_{\zeta_g})\; \op{Cat}(\zeta_g;\, \pi(\nu)) \right\} \prod_{k=1}^K \left\{ \op{Be}(\nu_k;\, 1, \alpha)\; \op{N}(\tilde{\beta_k};\,m_\beta, C_\beta)\;\op{IG}(\tilde{\sigma}^2_k;\,a_{\sigma^2},b_{\sigma^2})\right\} \op{Ga}(\alpha;a_\alpha,b_\alpha)
+= \prod_{g=1}^G \left[ \op{N}(y_g;\,\beta_{\zeta_g},\sigma^2_{\zeta_g})\; \op{Cat}_K(\zeta_g;\, \pi(\nu)) \right] \prod_{k=1}^K \left[ \op{Be}(\nu_k;\, 1, \alpha)\; \op{N}(\tilde{\beta_k};\,m_\beta, C_\beta)\;\op{IG}(\tilde{\sigma}^2_k;\,a_{\sigma^2},b_{\sigma^2})\right] \op{Ga}(\alpha;a_\alpha,b_\alpha)
 \end{equation*}
-The first equality follows from the  invariance to reparameterization of the posterior distribution, and the last equality follows from the product rule of conditionally independent random variables.
+The first equality follows from the  invariance to reparameterization of the posterior distribution; that is, while we are interested in the posterior distribution of the $\beta_g$ and $\sigma_g$ (diagram $a)$ in Figure \ref{dag}), we lose nothing by formulating the problem in terms of $\zeta_g$, $\tilde{\beta}_k$ and $\tilde{\sigma}_k$ (diagram $b)$). The last equality follows from the product rule of conditionally independent random variables.
 
 \subsection{Full conditionals}
 \label{subsec:full-cond}
 Our blocked Gibbs sampler is constructed as follows:
 \paragraph{Step 1:}
-Both the allocation parameters, $\zeta_g$ and the DP concentration parameter, $\alpha$, are conditionally independent given $\pi, \beta, \sigma^2$ and the full conditional distribution is given by
+Both the allocation parameters, $\zeta_g$ and the DP concentration parameter, $\alpha$, are \textit{mutually conditionally independent} given $\pi, \beta, \sigma^2$ and the full conditional distribution is given by
 
 \begin{equation}
-p(\zeta, \alpha|\cdot) \propto \prod_{g=1}^G \left[ \op{N}(y_g;\,\beta_{\zeta_g},\sigma^2_{\zeta_g}W_g)\; \op{Cat}(\zeta_g;\, \pi(\nu)) \right] \prod_{k=1}^K \left[ \op{Be}(\nu_k;\, 1, \alpha)\; \op{Ga}(\alpha;a_\alpha,b_\alpha)\right],
+p(\zeta, \alpha|\cdot) \propto \prod_{g=1}^G \left[ \op{N}(y_g;\,\beta_{\zeta_g},\sigma^2_{\zeta_g}W_g)\; \op{Cat}_K(\zeta_g;\, \pi(\nu)) \right] \prod_{k=1}^K \left[ \op{Be}(\nu_k;\, 1, \alpha)\; \op{Ga}(\alpha;a_\alpha,b_\alpha)\right],
 \end{equation}
 with conditional independence being implied by the product rule. For $\zeta$ we get
 \begin{equation}
@@ -231,7 +232,7 @@ We see that $\alpha$ depends only on $\nu$:
 
 
 
-The full conditionals for $\tilde{\beta}_k$ and $\tilde{\sigma}^2_k$ are straightforward, due to conjugacy. However, for a given $k$, the full conditional for $\tilde{\beta}_k$ depends on $\tilde{\sigma}^2_k$, and visa versa.
+The full conditionals for $\tilde{\beta}_k$ and $\tilde{\sigma}^2_k$ are straightforward, due to conjugacy. However, due to Equation \ref{eq:Q}, the full conditional for $\tilde{\beta}_k$ depends on $\tilde{\sigma}^2_k$, and visa versa. An alternative specification for the distribution of $\tilde{\beta}_k$, $\tilde{\beta}_k \ind \op{N}\left(m_\beta, \tilde{\sigma}^2_k \mbox{diag}(c_1,\ldots,c_p)\right)$ would allow for joint updates of $(\tilde{\beta}_k,\tilde{\sigma}_k)$ with conjugacy. We opted for our approach, finding it more intuitive to specify $C_\beta$ than $\mbox{diag}(c_1,\ldots,c_p)$.
 
 \paragraph{Step 2:} 
 The full conditional for cluster location, $\tilde{\beta}_k$:
@@ -273,7 +274,9 @@ The full conditional for cluster location, $\tilde{\beta}_k$:
 \section{Computation on the GPU}
 \label{sec:parallel}
 \subsection{General Remarks}
-Modern GPUs offer hundreds or thousands of cores that can provide concurrent excecution. Compared with multi-core CPUs, which typically boast 16 or fewer processors, this suggests a large benefit to using GPUs to exploit parallelism. While these benefits are becoming more widely recognized and gaining visibility through some large software projects such as Tensorflow, as with any technology there limitations, trade-offs and can be additional complications. We now direct attention to some differences in implementation, compared to traditional CPU programming, that are required when porting code to a GPU platform.
+Modern GPUs offer hundreds to thousands of cores and are capable of handling over a million of concurrent processes. Compared with multi-core CPUs, which typically boast 16 or fewer processors, this suggests a large benefit to using GPUs to exploit parallelism. 
+%While these benefits are becoming more widely recognized and gaining visibility through some large software projects such as Tensorflow, as with any technology there limitations, trade-offs and can be additional complications. 
+We now direct attention to some differences in implementation, compared to traditional CPU programming, that are required when porting code to a GPU platform.
 
 GPUs are usually subservient to a host CPU: the executing program is run on a CPU which turns over control periodically to the GPU to run specific tasks. These tasks, or ``kernels", follow the single instruction, multiple data (SIMD) paradigm. Each core on the GPU is assigned to work on a specific chunk of memory, but all cores execute the same program. Each instance of the program is called a ``thread". It is desirable to avoid branching logic in kernels, in part because the GPU cores are relatively slow, so branching can easily lead to high latency. The best results are obtained by having all threads proceed in lockstep.
 
@@ -283,6 +286,8 @@ When programming for the CPU, memory accesses tend to be fast. On the GPU, while
 
 Threads are themselves organized into ``warps". When data is read from global memory, it reads not one address at a time, but in chunks to minimize overhead costs. To take advantage of this, consecutively indexed threads should use data from memory at consecutive addresses. When this happens, the reads are ``coalesced". If consecutive threads access addresses that are distant to one another, reads are not coalesced, which will make memory transfer inefficient, hence the program will tend to be slow.
 
+For more specifics on GPU computing for statistics, see \citet{suchard2010}. In the following subsections, we use some examples to demonstrate some instances where parallelism can help to accelerate routine computation.
+
 \subsection{Routines}
 \label{sec:routines}
 \subsubsection{Reductions}
@@ -291,7 +296,7 @@ On the GPU, individual processors are slow, and asynchronous tasks can result in
 
 \begin{pseudocode}[ruled]{Parallel-Reduce}{a}
 \label{reduce}
-\COMMENT{Parallel reduction of $n=2^D$ elements. Upon completion, $a[2^D]$}\\
+\COMMENT{Parallel reduction of $n=2^D$ elements. Upon completion, $a[2^D]=s_{1:n}$}\\
 \FOR d \GETS 1 \TO D \DO \BEGIN
   \FOR i \GETS 1 \TO n \mbox{ \em in parallel }\DO \BEGIN
     \IF i \mbox{ mod } 2^d=0 \DO \BEGIN
@@ -301,11 +306,11 @@ On the GPU, individual processors are slow, and asynchronous tasks can result in
 
 \begin{figure}
 \includegraphics[width=\textwidth]{diagram}
-\caption{Diagram illustrating Parallel-Reduce and Parallel-Scan for an array of length $2^3=8$. Arrows pointing down indicate that the value in a position is accumulated from the previous step. Arrows pointing right indicate that values are accumulated from left to right. Arrows pointing left indicate that the value is copied from right to left. Parallel-Reduce results in the sum of the original elements being contained in the right-most position. Parallel-Scan uses the partial sums produced as a side-effect of Parallel-Reduce to result each position holding the sum of the elements originally held in the positions to the left.}
+\caption{Diagram illustrating Parallel-Reduce and Parallel-Scan for an array of length $2^3=8$. Values in each row indicate the value after completing a step in the outer loop indicated by ``$d=x$''. $s_{i:j}$ denotes a sum of the original elements, $s_{i:j}=\sum_{k=i}^j a_k$. Arrows pointing down indicate that the previous value is carried forward from the previous step. Arrows pointing right indicate that the value in the left position increments the value previously contained in the right position. Arrows pointing left indicate that the value is copied from right to left. Parallel-Reduce results in the sum of all the original elements being contained in the right-most position. Parallel-Scan uses the partial sums produced as a side-effect of Parallel-Reduce to produce the result that each position holds the sum of the original elements to the left.}
 \label{scan-illustration}
 \end{figure}
 
-To see why Parallel-Reduce works, let $a$ be an array of size $n=2^D$, $a=(a_1,\ldots,a_n)$. At the end of iteration $d$ of the outer loop, the memory in the $i$ position, where $i \mod 2^d =0$, contains the sum, $s_{(i-2^d+1):i}$, which reduces problem of computing $s_{1:n}$ to $\sum_{j=1}^{2^{D-d}}(s_{(j\cdot 2^d-2^d+1):(j\cdot 2^d)})$. In the last iteration, the target is computed simply by adding the partial results in $a_{2^{D-1}}$ and $a_{2^{D}}$. Upon completion of the routine, modified positions in memory contain partial sums of the original values. These ``side effects" of algorithm turn out to be useful for another purpose, as we will see shortly. 
+To see why Parallel-Reduce works, let $a$ be an array of size $n=2^D$, $a=(a_1,\ldots,a_n)$. At the end of iteration $d$ of the outer loop, the memory in the $i$ position, where $i \mod 2^d =0$, contains the sum, $s_{(i-2^{d-1}+1):i}$, which reduces problem of computing $s_{1:n}$ to $\sum_{j=1}^{2^{D-d}}(s_{((j-1) 2^d+1):(j\cdot 2^d)})$. In the last iteration, the target is computed simply by adding the partial results in $a_{2^{D-1}}$ and $a_{2^{D}}$. Upon completion of the routine, modified positions in memory contain partial sums of the original values. These ``side effects" of algorithm turn out to be useful for another purpose, as we will see shortly. 
 
 % Assuming no constraint on the number of processors, algorithm \ref{reduce} illustrates good GPU programming strategies. In the first iteration of the outer loop, the inner loop keeps a maximal number of threads busy with identical tasks, requiring similar and parallel memory accesses, two reads and one write. While half of these threads become idle in subsequent loops, the active threads always write to the same place. In practice, since device memory is not flat, as was discussed in the previous subsection, an optimal implementation would make use of shared memory after the first read. Reading and writing from shared memory is much faster than from global memory and is accessible to all threads in a block.
 
@@ -315,10 +320,10 @@ To see why Parallel-Reduce works, let $a$ be an array of size $n=2^D$, $a=(a_1,\
 %\caption{Parallel reduction of $n=2^d$ elements (upsweep step of scan). Upon return, total is stored in $a[n]$.}
 
 \subsubsection{Parallel scans}
-\citet{blelloch1990} described a general algorithm for parallel scans. These include parallel cumulative sums as a special case; generally a parallel scan involve computing $a_1,
-a_1 + a_2, \ldots, a_1 + \ldots + a_n$. Just as with Parallel-Reduce, `$+$' can be any associative binary operator. 
+\citet{blelloch1990} described a general algorithm for parallel scans. These include parallel cumulative sums as a special case. Parallel scans can be divided into two general types: exclusive scans produce $s=(0, s_{1:1}, s_{1:2}, \ldots, s_{1:(n-1)})$ and inclusive scans produce $s=(s_{1:1},s_{1:2},\ldots,s_{1:n})$. Just as with Parallel-Reduce, `$+$' can be replaced by any associative binary operator. 
+ Clearly, an exclusive scan can be generated from an exclusive scan by dropping the first element and appending $s_{1:n}$, and similarly an exclusive scan can be generated from an inclusive scan by dropping the last element and prepending a zero. While readers are likely more familiar with the inclusive scan, the parallel algorithm we discuss here is for an exclusive scan.
 
-Blelloch describes the simplest case is for an array with $2^d$ elements and $2^{d-1}$ processors. The algorithm is composed of two steps: Parallel-Reduce (referred to in \cite{blelloch1990} as``upsweep"; Algorithm \ref{reduce}), which is followed by a second stage (which Blelloch refers to as ``downsweep"). Given an input array $a$, an Parallel-Reduce modifies the array $a$, defined above, so that the memory in position $i$ contains $s_{1:(i-1)}=\sum_{j=0}^{i-1}a_j$, using the convention that $a_0=0$, i.e. the identity element. The entire program is detailed in Algorithm \ref{scan}.
+For simplicity, we describe the case for an array with $2^d$ elements and $2^{d-1}$ processors. The algorithm is composed of two steps: Parallel-Reduce (referred to in \cite{blelloch1990} as``upsweep"; Algorithm \ref{reduce}), which is followed by a second stage (which Blelloch refers to as ``downsweep"). Given an input array $a$, an Parallel-Reduce modifies the array $a$, defined above, so that the memory in position $i$ contains $s_{1:(i-1)}=\sum_{j=0}^{i-1}a_j$. By convention, $a_0=0$, i.e. the identity element. Pseudocode is given in Algorithm \ref{scan}.
 
 \begin{pseudocode}[ruled]{Parallel-Scan}{a}
 \label{scan}
@@ -338,21 +343,32 @@ a[n] \GETS 0\\
 % A serial version of this algorithm, $z_1 = v_1,\;z_2 = z_1 \oplus v_2,\dots$, is ill-suited to the GPU.
 
 
-The second stage of Parallel-Scan works with the partial results in left in memory after the upsweep. Picking up the example of the last subsection, define $b_{i,D}b_{i,D-1}\cdots b_{i,1}b_{i,0}$ to be the binary representation of the integer $i$. For example, if $D=4$, $i=11=01011_{2}$, with $b_{i,4}=0,\, b_{i,3}=1,\,b_{i,2}=0,\,b_{i,1}=1$ and $b_{i,0}=1$. For each $b_{i,d}=1$ in $b_i$, there is a partial sum of $2^d$ values produced in the upsweep that are used in computing $s_i$. Furthermore, the number of ones is equal to the number of partial sums needed to produce the result. For example, upon completion, $a_{12}$ will have $s_{11}=\sum_{i=1}^8 v_i + \sum_{i=9}^{10}v_i+\sum_{i=11}^{11}v_i$. 
+The second stage of Parallel-Scan works with the partial results in left in memory after Parallel-Reduce. First, note that a maximum of $\lfloor \log_2(i) \rfloor$ partial sums are required for computing $s_{1:(i-1)}$, thus the number of steps in the second stage is the minimum number required. After setting the right-most position to zero, the second stage of Parallel-Scan works on the same sets of pairs of positions as Parallel-Reduce, only in reverse order. Within each pair, the value in the left position is stored in a temporary buffer, then the copy from the right position is copied to the left position. Last, the value in the right position is incremented by the value in the buffer. Intuitively, this works because the accumulated value from previous steps is a sum of values to the left of the current left position while the sum in the current left position is required by to compute the right position's target value. \citet{blelloch1990} provides a proof by induction of the correctness of the result.
 
-In the downsweep, at step $d$ of the outer loop, pairs of indices are formed, $i$ and $\tilde{i}$, $i>\tilde{i}$, such that $b_i$ and $b_{\tilde{i}}$ differ only in $b_{.,d}$ and both $b_{i,c}$ and $b_{\tilde{i},c}=1$ for $0\le c<d$. By construction, $i$ will have been included the previous step, while $\tilde{i}$ will have not since $b_{\tilde{i},d}=0$. Within this pairing, $a_{\tilde{i}+1}$ is set to the current value of $a_{i+1}$, i.e. the accumulation of values in the partial sums corresponding to $b_{i,D},\, \ldots, b_{i,d+1}$ while $a_{i+1}$ increments by the value in $a_{\tilde{i}+1}=s_{\tilde{i}}-s_{2^{h(\tilde{i})}}$.
+
+
+% (Picking up the example of the last subsection, define $b_{i,D}b_{i,D-1}\cdots b_{i,1}b_{i,0}$ to be the binary representation of the integer $i$. For example, if $D=4$, $i=11=01011_{2}$, with $b_{i,4}=0,\, b_{i,3}=1,\,b_{i,2}=0,\,b_{i,1}=1$ and $b_{i,0}=1$. For each $b_{i,d}=1$ in $b_i$, there is a partial sum of $2^d$ values produced in the upsweep that are used in computing $s_i$. Furthermore, the number of ones is equal to the number of partial sums needed to produce the result. For example, upon completion, $a_{12}$ will have $s_{11}=\sum_{i=1}^8 v_i + \sum_{i=9}^{10}v_i+\sum_{i=11}^{11}v_i$. 
+% 
+% In the downsweep, at step $d$ of the outer loop, pairs of indices are formed, $i$ and $\tilde{i}$, $i>\tilde{i}$, such that $b_i$ and $b_{\tilde{i}}$ differ only in $b_{.,d}$ and both $b_{i,c}$ and $b_{\tilde{i},c}=1$ for $0\le c<d$. By construction, $i$ will have been included the previous step, while $\tilde{i}$ will have not since $b_{\tilde{i},d}=0$. Within this pairing, $a_{\tilde{i}+1}$ is set to the current value of $a_{i+1}$, i.e. the accumulation of values in the partial sums corresponding to $b_{i,D},\, \ldots, b_{i,d+1}$ while $a_{i+1}$ increments by the value in $a_{\tilde{i}+1}=s_{\tilde{i}}-s_{2^{h(\tilde{i})}}$.
 
 % Let $S_c = \{1 \le j \le 2^{d}: j \mod 2^c = 0\},\; c=0,...,d$. Note that $S_0 \supset S_1 \supset \cdots \supset S_d$ and define $\tilde{S}_c = S_c \setminus S_{c+1}$. Then $\mathcal{C} = \{\tilde{S}_0,\ldots,\tilde{S}_d\}$ is a partition of $\mathcal{J}=\{1,\ldots,2^d-1\}$. The function $h: \mathcal{J} \rightarrow \mathcal{C}$ given by $h(j) = c$ such that $j \in \tilde{S}_c$ is one-to-one. Define $b$ to be the state of memory after performing the upsweep on $a$. Then $b[j] = \sum_{k=j - 2^h(j) + 1}^j a[k]$. For each $j$ in $\mathcal{J}$, it has a binary representation $c_{d-1} \ldots c_1 c_0$, e.g. for $d=3$ and $j=5$, we can write it as $0101$. Then, we can compute $\sum_{k=1}^{j} a[k]$ by $b[2^{d-1}c_{d-1}]+b[2^{d-2}c_{d-2}+2^{d-2}c_{d-2}]+\cdots+b[2^{d-1}c_{d-1}+\cdots+2^0c_{0}]$.
 % Therefore,  compute $\sum_{k=1}^{j-1}$ for $j$ in $\mathcal{J}$, this can be done efficiently by $\sum_{c=\lfloor \log_2(j-1)\rfloor}^0 b[2^c]$
 
-For implementation details in CUDA see \citet{harris-scan}.
+In practice, there are physical constraints that require modifications to Parallel-Scan. For example, because the size of $a$ may not be a power of 2 and also because processors are typically much less than the size of $a$, the algorithm requires modification. One solution is to break the work into chunks, each with a size that is a power of 2. Each chunk is scanned separately by a single processor (in serial) and the scan totals written to a buffer. Next, the scan totals are themselves scanned in parallel. These scanned totals can be mapped by to the chunks, and are used as offsets for the values obtained from the original scan.
 
-If rather than $(0,s_1,\ldots,s_{n-1}$, $(s_1,s_2,\ldots,s_n)$, the first element can be dropped and the total computed in the upsweep appended. In case that the number of threads is restricted, possible modifications have been proposed. One possibility is to perform the same cumulative sum on segments of the data, saving the totals from reduction to new array. Following that, a cumulative sum can be performed on the processor totals. Finally, using the accumulated totals as offsets, cumulative sums on the segments can be performed independently (\cite{blelloch1990}).
+Both Parallel-Reduce and Parallel-Scan presented above require $O(\log_2(n))$ steps compared to the $O(n)$ required for a serial implementation. 
+%According to \citet{blelloch1990}, if $P$ processors are available, the time required to scan $n$ elements is $O(n/P + \log_2P)$. 
+The actual speed-up attained depends on hardware and implementation. \citet{harris-scan} implemented Parallel-Scan for GPUs based on the implementation in \citet{blelloch1990} and observed maximum speedups of 5 times over an optimized serial CPU implementation. The advantage of the GPU implementation increased with $n$ and then leveled off, acheiving its best performance on arrays with over 1 million elements. \citet{sengupta2008} implemented a variant of Parallel-Scan that is less efficient in that it requires a larger number of operations, but reduces the number of steps from $2\log_2(n)$ to $\log_2(n)$. They reported speedups of nearly $2\times$ compared to similar implementations based on Parallel-Scan. More recently, \citet{ha2013} offered an implementation based on an algorithm that is a hybrid of the two mentioned. They reported speedups of about $1.5\times$ when compared to the implementation of \citet{sengupta}.
+
+Parallel scans are used in various ways in our MCMC algorithm. For example, the calculation of cumulative probabilities to sample from categorical distributions in step 1 computes the cumulative sum -- on the log scale for numerical stability -- using $\log(e^{v_1}+e^{v_2})$ as the binary operator.
+% For a thorough treatment see \citet{blelloch1990}, and for implementation details in CUDA, see \citet{harris-scan}.
+
+% If rather than $(0,s_1,\ldots,s_{n-1}$, $(s_1,s_2,\ldots,s_n)$, the first element can be dropped and the total computed in the upsweep appended. In case that the number of threads is restricted, possible modifications have been proposed. One possibility is to perform the same cumulative sum on segments of the data, saving the totals from reduction to new array. Following that, a cumulative sum can be performed on the processor totals. Finally, using the accumulated totals as offsets, cumulative sums on the segments can be performed independently (\cite{blelloch1990}).
 
 
-If $P$ processors are available, the time required to scan $n$ elements is on the order $O(n/P + \log_2P)$, versus $O(n)$ for the serial algorithm, the same as the parallel reduction.
 
-This algorithm is used in various ways in our MCMC algorithm. For example, the calculation of cumulative probabilities to sample from categorical distributions in step 1 computes the cumulative sum on the log scale for numerical stability, using $\log(e^{v_1}+e^{v_2})$ as the binary operator.
+
+
 % Parallel scans are implemented in Thrust, called with \code{inclusive\_scan} for a full scan and \code{exclusive\_scan} for a prescan.
 %\subsubsection{Pseudo-random number generation}
 
@@ -384,28 +400,27 @@ In our implementation, first, separate kernels compute a) $y_g^\top W_g X \beta_
 To perform the categorical sampling of $\zeta$, we first perform a cumulative sum/scan of the weights (using log-sum-exp for numerical stability) for each gene. Define $S_{g,k}$ to be the $k^{th}$ partial log sum for gene $g$. Next, we draw $log U_g$, $U_g \sim \op{U}(0,1)$ add add the respective total log sum, $S_{g,K}$, obtaining $V_g = \log U_g + S_{g,K}$. Next, we have a kernel evaluate the comparison, $S_{g,k}<V_g$, returning $1$ if true and $0$ if false. The resulting $G\times K$ array is then reduced over each value of $g$, the result updating $\zeta$.
 
 \paragraph{Cluster atoms}
-A prerequisite to drawing from the full conditional distribution for the cluster atoms is to compute cluster summary statistics. Although this seems fairly straightforward, as it consists mainly to several reductions, this step is not nicely parallelizable as the elements to reduce are not contiguous, the groups being determined by the current value of $\zeta$. Rather than sorting (and copying) the data for each summary, we sort $\zeta$ storing both the sorted vector as well as the permutation that produced it. Using the stored permutation as a map for the summands, such as $y_g^\top W_g y_g$, we compute the corresponding summaries, $\sum_{g:\zeta_g=k}y_g^\top W_g y_g$, as if they were sorted using a specialized reduce algorithm, which reduces elements with a common key, the key being given by (sorted) $\zeta$. Note that this produces cluster summaries only for occupied clusters. Since the conditional distribution for cluster $k$ depends on ``updated" prior parameters that represent a combination of the data and the priors, it is convenient to fill a $K$-dimensional parameter vector, do the required computation for the occupied clusters, and then update the $K$-dimensional vector so that draws can be performed for all clusters in parallel.
+A prerequisite to drawing from the full conditional distribution for the cluster atoms is to compute cluster summary statistics. Although this seems fairly straightforward, consisting of a series of reductions, there is an additional complication in that the values to reduce are not contiguous, as the groups being determined by the current value of $\zeta$. Rather than sorting (and copying) the data for each summary, we sort $\zeta$ storing both the sorted vector as well as the permutation that produced it. Using the stored permutation as a map for the summands, such as $y_g^\top W_g y_g$, we compute the corresponding summaries, $\sum_{g:\zeta_g=k}y_g^\top W_g y_g$, as if they were sorted using a specialized reduce algorithm, which reduces elements with a common key, the key being given by (sorted) $\zeta$. Note that this produces cluster summaries only for occupied clusters. Since the conditional distribution for cluster $k$ depends on ``updated" prior parameters that represent a combination of the data and the priors, it is convenient to fill a $K$-dimensional parameter vector, do the required computation for the occupied clusters, and then update the $K$-dimensional vector so that draws can be performed for all clusters in parallel.
 
 \paragraph{Cluster regression coefficients}
 Computation of
-$\hat{C}_k^{-1}$, the precision matrix, is calculated, followed
-by in-place Cholesky decomposition. Next, $\hat{m}_k$ is computed
+$\hat{C}_k^{-1}$, the precision matrix, is calculated (using AoS), followed
+by Cholesky decomposition. For the sizes of $p$ we consider ($p<8$), local memory limitations do not seem to be a problem, so we simply instruct each thread to decompose one of the $K$ matrices. Next, $\hat{m}_k$ is computed
 by solving
 $\hat{C}_k^{-1}\hat{m}_k=\hat{C}_k^{-\frac{1}{2}}\left(\hat{C}_k^{-\frac{1}{2}}\hat{m}_k\right)
 = X^\top W_g y_g$, twice using a routine for solving triangular
 systems of equations. The full conditional draw for $\tilde{\beta}_k$ is
 accomplished by first generating multivariate standard normal draws, $Z_k$, and setting $\tilde{\beta}_k =
-\Lambda^{\frac{1}{2}} Z_k + \hat{\beta}_k$. The scaling operation is
+\hat{C}_k^{-\frac{1}{2}} Z_k + \hat{\beta}_k$. The scaling operation is
 done by solving a system of equations as before. These
-computations are all parallelized across all clusters, $1,\ldots,K$.
+computations are parallelized across clusters, $k=1,\ldots,K$.
 
 \paragraph{Cluster variance}
 For $\tilde{\sigma}^2_k$, the main hurdle is the computation of
-$\hat{}$. This is done in three steps, each parallel over $k$, using
-the AoS approach discussed in the beginning of this subsection. First,
-dot products for $\beta_k^\top \sum_{g:\zeta_g=k}X^\top W_g y_g$;
-second, quadratic forms for $\beta_k^\top\left( \sum_{g:\zeta_g=k}
-  X^\top W_g X \right) \beta_k$ and lastly, parallel summation of
+$\hat{b}_k$. This is done in three steps, each parallel over $k$, using
+the SoA approach. First,
+we compute the dot products, $\beta_k^\top \sum_{g:\zeta_g=k}X^\top W_g y_g$, followed by the quadratic forms, $\beta_k^\top\left( \sum_{g:\zeta_g=k}
+  X^\top W_g X \right) \beta_k$, and, lastly, parallel summation of
 these with $\sum_{g:\zeta_g=k}y_g^\top y_g.$
 
 \paragraph{Cluster weights}
@@ -420,24 +435,28 @@ The scalar parameter $\alpha$ depends only on the constants $K$, $a_\alpha$ and 
 
 
 
-\subsection{Multimodality and initialization}
+\subsection{Initialization}
 \label{subsec:initialization}
-\citet{papas} identified an issue with conditional samplers for DP
-mixture models that rely on the stick-breaking construction. They
-noted that, although the cluster weights are stochastically
-ordered, the ordering of cluster labels is only weakly identifiable,
-so that the posterior distributions for the weight at any given index
-is multi-modal. This is due to many configurations of the allocation
-parameters being nearly equivalent in the posterior. 
+\iftoggle{thesis}
+{ \citet{papas} identified an issue with conditional samplers for DP
+  mixture models that rely on the stick-breaking construction. They
+  noted that, although the cluster weights are stochastically
+  ordered, the ordering of cluster labels is only weakly identifiable,
+  so that the posterior distributions for the weight at any given index
+  is multi-modal. This is due to many configurations of the allocation
+  parameters being nearly equivalent in the posterior. We suspect that, because of this weakness, poor initialization can
+  lead to very slow covergence.
+  % index becomes occupied, leading to a high draw for $\alpha$, which
+  % increases subsequent draws for $\pi_k$, and so forth. In particular,
+  % especially when $p$ is moderately large, during the initial stages the
+  % $K^{th}$ cluster can become occupied. This leads to very large draws
+  % for $\alpha$, which can greatly decrease the quality of the truncation
+  % approximation. To avoid this problem, we reorder the cluster indices by their current value of $\pi_k$ after a short initial run, then proceed to subsequent burn-in iterations.
+}
 
-We find empirically that, because of this weakness, poor initialization can
-lead to very slow mixing of $\alpha$, whereby a cluster, $k$, with a large
-index becomes occupied, leading to a high draw for $\alpha$, which
-increases subsequent draws for $\pi_k$, and so forth. In particular,
-especially when $p$ is moderately large, during the initial stages the
-$K^{th}$ cluster can become occupied. This leads to very large draws
-for $\alpha$, which can greatly decrease the quality of the truncation
-approximation. To avoid this problem, we reorder the cluster indices by their current value of $\pi_k$ after a short initial run, then proceed to subsequent burn-in iterations. 
+  We initialize our chains as follows. Using the ranges of independent estimates of the gene-specific parameters, we set a regular $(p+1)$-dimensional grid. Using the base measure, we sort the grid values by their prior densities in descending order, retaining the first $K$. We set $\pi_k=1/K$ for all $k=1,\ldots,K$ and $\alpha$ to 1. Next we run the sampler for several thousand iterations. The initialization is taken to be the last iteration of the first chain, but with the indices reordered in descending order by $\pi$. The purpose for reordering is that, in the first chain, it is common for the last cluster to become occupied early and never become unoccupied. This is undesireable, as it undermines the quality of the truncation approximation. Reordering the indices after most of the clusters have become established seems to correct the problem (provided that $K$ is selected to be large enough.)
+
+
 %Figure \ref{fig:max-id} shows traceplots of a series of Markov chains where reordering has been applied to each. The top frame shows the maximum occupied cluster ID and the bottom frame shows the value of $\alpha$. This example is simulated data with $G=40,000,\, p=6,\, \mbox{and } K=8000$.
 
 % \begin{figure}
@@ -459,12 +478,16 @@ Because of the dimensionality of the problem is large, it is cumbersome to save 
 \end{enumerate}
 Updates of these quantities are embarrasingly parallel across $g$, so are well suited to the GPU. The update in 1) is done elementwise, based on a running sum, and the update in 2) can be decomposed into four tasks, a matrix multiplication to compute $C\beta$, an elementwise evaluation of the sign of the value, a parallel setwise reduction using the minimum to evaluate each conjunction, and finally an update of the estimator (using the same functionality as 1)).
 
-We do save and return several low-dimensional parameters which provide some information on the overall behavior of the sampler: the number of occupied clusters, the maximum id of the occupied clusters and $\alpha$, the concentration parameter.
+We also save and return several low-dimensional parameters which provide some information on the overall behavior of the sampler: the number of occupied clusters, the maximum id of the occupied clusters and $\alpha$, the concentration parameter. We also optionally return samples of selected gene-specific parameters and a user-specified number of draws of $\mathcal{P}$.
 
 
 \section{Simulation Study}
 \label{sec:timing}
-To study the performance, we conducted a simulation study. To assess the time requirements, because time efficiency will depend both on the algorithmic implementation, that is, the raw time it takes to complete an MCMC iteration, but also on the statistical efficiency, i.e. the rate of mixing and the autocorrelation of the chain. Because it accounts for both factors, the measure we focus on is the time per effective sample. In particular, we focus on the samping for $\alpha$, both for simplicity and because it tends to reflect changes in the overall behavior of the Gibbs sampler.
+To assess the time per iteration and time to convergence, we simulated data and sampled from the posterior using our algorithm. Seconds per iteration was calculated by dividing the total time during the sampling phase (after burn-in and initialization) by the number of iterations to obtain one measure of this variable for each simulated data set. The time required to obtain a sufficient number of samples depends not only on the time per iteration, but also the number of MCMC samples required to obtain an ``effective sample" after correcting for the autocorrelation of the chain. Therefore, we also considered seconds per effective sample.
+
+We identified several factors that could potentially impact the running time: the dimension of the regression coefficients, $p$, the number of groups, $G$, and truncation limit, $K$. We held the sample size proportional to the dimension of the problem, $N=4p$. For the simulations, we first generated a distribution $P$ (as in Eq. \ref{eq:P}). We did this by first producing $K_t=\lfloor \sqrt{G}\rfloor$ cluster components, $\tilde{\beta}_k$, which were generated independently from a multivariate normal distribution with diagonal covariance. We chose to have the variance decrease with the dimension; this decision was somewhat arbitrary, but is consistent with empirical observation that the proportion of significant effects is often inversely related to the dimension of the design matrix in regression. The cluster variances, $\tilde{\sigma^2}_k$ were generated independently from a gamma distribution. The gene-specific coefficients, $\beta_g$ and variances, $\sigma^2_g$, were chosen by drawing an index $k$ uniformly with replacement from the set $\{1,...,K_t\}$. Finally, conditional on $(\beta_g,\sigma^2_g)$, log-expression data were generated from the normal distribution as in Equation \ref{eq:data}.
+
+In particular, we focus on the samping for $\alpha$, both for simplicity and because it tends to reflect changes in the overall behavior of the Gibbs sampler.
 
 We work with simulated data and consider three factors: $G$, the number of genes, $K$, the truncation limit, and $p$, the dimension of $\beta_g$. For each combination of the levels of these three factors we simulated data as shown below.
 
@@ -566,6 +589,15 @@ Table \ref{tab:regression} shows the result of fitting a linear regression of $\
 \section{Example: Paschold maize data}
 \label{sec:analysis}
 \citet{paschold} produced an RNA-seq data set for gene expression of root tissue from 4 samples for each of two recombinant inbred maize genotypes, B73 and Mo17. Each sample was obtained from a combination of 10 primary roots from seedlings 3.5 days after germination. Illumina's Genome Analyzer II was used for sequencing. Two flow cells were utilized, with four replicates of each genotype split across flowcells. Among the researchers' aims was to identify genes which were differentially expressed in these parental lines.
+
+\paragraph{Normalization} For various technical reasons, normalization of the table columns (`between-sample' normalization) is needed to adjust for systematic differences arising from technical factors unrelated to the quantities of interest.
+
+For example, in RNA-seq experiments, the total of all read counts (`library size') for a sample will vary, in part, due to differences in sequencing depth. A simple adjustment for library size is to convert total read counts to a relative proportion, such as counts per million (cpm). A criticism of this approach to normalization is that the library size may be driven primarily by a few highly sequenced genes, making this approach too volatile. More robust approaches have been proposed; for further discussion, see \citet{oshlack2010rna}.
+
+\paragraph{Transformation} Because the data are non-negative and variability in expression tends to increase with the overall expression,  gene expression data is typically analyzed on a logarithmic scale, with difference in expression being multiplicative. The large number of zero counts usually present in RNA-seq data, preclude taking logarithms of the raw data. Using a generalized linear modeling approach avoids this problem by specifying a discrete probability model for the counts, while the log-mean expression is modeled as a linear function of the model parameters.
+
+For computational reasons, we assume a normal model for the data after transforming it. First, we compute normalization factor $c_i$ for each column; second, we take logarithms of the data, after adding 1, and apply the normalization on the log scale, .i.e.
+$$\mbox{transformed log-count in column }i = \log (\mbox{original count in column }i+1) + \log(c_i)$$. \iftoggle{thesis}{The result after applying these steps to the data in Table \ref{tab:data} are shown in Table \ref{tab:data-transformed}}.
 
 \subsection{Model}
 We let $Y_{gci} = \log \frac{Z_{gci}+1}{C_{ci}}$, where $Z_{gi}$ is the total read count for replicate $i$ of genotype $c$. $C_{ci}$ is a normalizing constant which is used to adjust for differences in the total RNA content in each sample. We estimate the normalizing constants using the trimmed mean of M-values procedure \cite{robinson2010}. Our design matrix for each gene (collapsing identical rows) is
