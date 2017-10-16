@@ -399,7 +399,7 @@ The computational complexity for this step is $O(GKp^2)$. Fortunately, computati
 \log Pr(\zeta_g=k|\cdot) = constant + \log \pi_k -N \log \sigma_k - \frac{1}{2\sigma^2_k}\left(y_g^\top W_g y_g - 2y_g^\top W_g X \beta_k + \beta^\top X^\top W_g X \beta \right).
 \end{equation}
 
-In our implementation, first, separate kernels compute a) $y_g^\top W_g X \beta_k$ and b) $\beta^\top X^\top W_g X \beta$. a) reduces to a matrix multiplcation problem, for which optimized software has been developed for the GPU. To see this, let $B^\top D$, where $\tilde{\beta}_k$ form the columns of $B$, and $X^\top W_g y_g$ form the columns of $D$. b) is accomplished using the SoA approach. Once a) and b) have been computed and stored in global memory, (\ref{logweight}) is computed, again using an AoS approach.
+In our implementation, first, separate kernels compute a) $y_g^\top W_g X \beta_k$ and b) $\beta^\top X^\top W_g X \beta$. a) reduces to a matrix multiplcation problem, for which optimized software has been developed for the GPU. To see this, let $B^\top D$, where $\tilde{\beta}_k$ form the columns of $B$, and $X^\top W_g y_g$ form the columns of $D$. b) is accomplished using the SoA approach. Once a) and b) have been computed and stored in global memory, (\ref{logweight}) is computed, again using an SoA approach.
 
 To perform the categorical sampling of $\zeta$, we first perform a cumulative sum/scan of the weights (using log-sum-exp for numerical stability) for each gene. Define $S_{g,k}$ to be the $k^{th}$ partial log sum for gene $g$. Next, we draw $log U_g$, $U_g \sim \op{U}(0,1)$ add add the respective total log sum, $S_{g,K}$, obtaining $V_g = \log U_g + S_{g,K}$. Next, we have a kernel evaluate the comparison, $S_{g,k}<V_g$, returning $1$ if true and $0$ if false. The resulting $G\times K$ array is then reduced over each value of $g$, the result updating $\zeta$.
 
@@ -651,7 +651,25 @@ To check for convergence, potential scale reduction factors (`R-hats') were esti
 }
 
 \subsection{Comparison of methods}
-In addition to our method, we also fit the data using two other model: a linear mixed-effects model, treating gene-specific parameters as random effects, and all genes independently using least squares. For every method we parameterized the gene-specific mean with an intercept, an additive effect for the $Mo17$ genotype, and an additive effect for flow cell 2. The gene independent model, which produces a gene-specific variance estimate borrows no information across genes. The linear mixed-effects model assumes a bivariate normal distribution for all the gene-specific mean parameters. Because the covariance and the mean of this distribution is estimatated from the data, this model does borrow information across genes (since software assumes a zero mean for the random gene effects, we also estimate a fixed effect which corresponds to the unknown mean.) This method assumes homogeneity of the error variance across genes.
+In addition to our method, we also fit the data using two other methods/models: a gene independent model, fitted using least squares, and a hierarchical linear model, fitted by REML, which assumes constant variance and assumes a multivariate normal distribution for the random effects. These models were chosen to show illustrate the nonparametric shrinkage acheived by the BNP model, not because they are recommended or widely used methods for the analysis of these sorts of data.
+
+\paragraph{Gene independent model}
+Estimate $\beta_g$ in Equation \ref{eq:data} by minimizing $\sum_{n=1}^N r_{gn}^2 = \sum_{n=1}^N\left(y_{gn}-x_n\beta_g\right)^2$. This method also provides an estimate of $\sigma_g^2$, $\hat{\sigma^2}_g = \sum_{n=1}^N r_{gn}^2/(p)$.
+
+\paragraph{Hierarchical/random effects model}
+In addition to Equation \ref{eq:data}, assume $\sigma^2_g = \sigma^2$ for all $g=1,\ldots,G$, and that $\mathcal{P} = \op{N}\left(\mu, \Sigma \right)$, for some $\mu \in \mathbb{R}^p$ and $\Sigma$ a positive definite matrix. This model was fit using the $lmer$ function in the $lme4$ package in $R$ \citep{lme4,r}.
+
+In contrast to the BNP model, the gene independent model puts no assumptions on the distribution of gene-specific parameters and borrows no information across genes. The hierarchical linear model assumes that the $\beta_g$ parameters are realizations of a multivariate normal distribution. This allows for borrowing of information, since $\mu$ and $\Sigma$ are estimated using all of the data and inference for $\beta_g$ is moderated by them.
+
+Since the hierarchical linear model restricts $\mathcal{P}$ to the family of multivariate normal distributions, the effect of borrowing information via $\mathcal{P}$ is to pull all estimates for $\beta_g$ toward a common value. In Figure \ref{pairs-3-methods}, by comparing the bivariate histograms of the point estimates obtained by the hierarchical model (middle column) to the gene independent model (left column), there is detectable shrinkage. This shrinkage preserves the shape of the distribution of estimates obtained by the gene independent model while reducing the magnitude of the estimates by shrinking them toward a common value. By comparison, of the point estimates obtained by the BNP model (posterior means), some are shrunk while some are not and the degree of shrinkage in many cases is more dramatic. For example, in the three-way comparison of the bottom panels, the BNP shows aggressive shrinkage, relative to the hierarchical model, of the estimates of Mo17 toward zero for those genes with the most negative flow cell effects. Figure \ref{local-shrink} shows this phenomena in greater detail. The left-panels show a zoomed in version of the lower-left plot in Figure \ref{pairs-3-methods}, with a bounding box identifying a region of interest. The next plot to the right shows the gene independent estimates from that region, while the last two plots in the row show the corresponding estimates for the hierarchical and BNP models. The BNP estimates are much less predictable, but they show clear local shrinkage toward regions with high density in the left-most plot. The seemingly erratic behavior is related to the two additional dimensions in which are ignored in these plots, but in which the shrinkage is being applied.
+
+\begin{figure}
+\centering
+\includegraphics[width=.9\textwidth]{local_shrink}
+\caption{\small Comparisons of the parameter estimates under each method.}
+\label{method-compare}
+\end{figure}
+
 
 \begin{figure}
 \centering
@@ -737,7 +755,7 @@ There are several libraries that make implementing these algorithms easier in CU
   \code{thrust::zip\_iterator} is very useful, as it can be used
   to iterate
   over a \code{thrust::tuple}. This approach is very general, allowing
-  for operations involving up to ten variables using an AoS
+  for operations involving up to ten variables using an SoA
   design.
 
 \item \code{thrust::reduce/reduce\_by\_key}: As described in section
