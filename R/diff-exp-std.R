@@ -35,8 +35,12 @@ X <- filter(my_dat, GeneID == my_dat$GeneID[1]) %>% head(8) %>%
   model.matrix(~genotype+flow_cell, data=.)
 
 y <- data.matrix(my_dat_wide[,2:9])
+# dge <- edgeR::DGEList(y)
+# dge <- calcNormFactors(dge)
 
 cuda_dat <- formatData(counts = y, groups = rep(1:2, each=4), X = X, voom = FALSE, transform_y=identity)
+
+
 ind_est <- indEstimates(cuda_dat)
 
 save(ind_est, file="data/ind-est-std.RData")

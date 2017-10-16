@@ -18,7 +18,7 @@ Much effort has gone into researching methods in the case of gene expression. Se
 \begin{figure}[ht]
 \centering
 \includegraphics[width=.6\textwidth]{pairs-ind-est-std}
-\caption{Bivariate histograms of independent estimates of effects and standard deviation obtained by ordinary least squares for 36,081 genes (data from \cite{paschold}). This example shows that random effects models assuming normality and/or independence may not be suitable for modeling gene expression hierarchically. For more on the data, including definitions of $\beta_1$, $\beta_2$, $\beta_3$, and $\sigma$, see Section \ref{sec:analysis}.}
+\caption{\small Bivariate histograms of independent estimates of effects and standard deviation obtained by ordinary least squares for 36,081 genes (data from \cite{paschold}). This example shows that random effects models assuming normality and/or independence may not be suitable for modeling gene expression hierarchically. For more on the data, including definitions of $\beta_1$, $\beta_2$, $\beta_3$, and $\sigma$, see Section \ref{sec:analysis}.}
 \label{pairs-ind-est}
 \end{figure}
 
@@ -83,9 +83,10 @@ $\vdots$ &  &  &  & $\vdots$ &  & &  & $\vdots$ \\
 \section{Bayesian nonparametric hierarchical regression model}
 \label{sec:model}
 Let $y_{gn}$ represent the observed expression (possibly after transformation) for gene $g$, sample $n$. Let $x_{n}^\top$ be the row of the design matrix $X$ corresponding to sample $n$. We will use the upper case letters $G$ and $N$, to denote the number of genes and samples, respectively. In addition, we accommodate possible observation-level weights, $w_{gn}$. For the observed data, we assume the data model
-\begin{equation*}
+\begin{equation}
+\label{eq:data}
 y_{gn} \ind \op{N} \left( x_{n}^\top \beta_g, \sigma^2_g \right),
-\end{equation*}
+\end{equation}
 We model jointly
 
 \begin{equation*}
@@ -104,6 +105,7 @@ As shown by \citet{sethuraman}, it follows from the definition of the Dirichlet 
 
 Let 
 \begin{equation}
+\label{eq:P}
 \mathcal{P} =\sum_{k=1}^\infty \pi_k \delta_{\left(\tilde{\beta}_k^\top ,\tilde{\sigma}^2_k\right)},
 \end{equation}
 where $\delta_{(.)}$ is the Dirac delta function. Note that although almost sure discreteness is a property applicable to ``draws'' from a DP, the posterior for $\mathcal{P}$ is in fact a mixture of DP \citep{antoniak}. An implication of discretness can be thought of as a ``bet on sparsity"; that there are actually a finite (but unspecified) number of unique values that $(\beta_g^\top,\sigma^2_g)$ can take.  
@@ -143,13 +145,15 @@ This assumption induces a stochastically decreasing ordering of the weights, so 
 \label{sec:inference}
 We adopt a Bayesian approach for estimation and inference for the DP mixture model described in Section \ref{sec:model}. This requires a specification the completion of a full probability model by specifying prior distributions. Looking at Figure \ref{dag}, which shows the directed acyclical graphs representing the model, specifying a prior amounts to choosing values for model parameters which have no arrows pointing toward them, i.e. whose distribution is not otherwise specified in the model.
 
-We choose values of $m_\beta,\,C_\beta,\,a_{\sigma^2},\,b_{\sigma^2}$ so that $Q$ puts mass on reasonable values of the $p+1$ dimensional parameters $\left(\tilde{\beta}_g^\top,\tilde{\sigma}^2_g\right)$. This can be though of as an empirical Bayes approach. Alternatively, one could also select values based on prior experience. In any case, using informative or weakly informative priors for is important; if $Q$ is chose to be diffuse, that can be overly informative and lead to only few large $\pi_k$ accounting for most of the total probability in the mixture, $\mathcal{P}$ \citep{gelman-book}.
+We choose values of $m_\beta,\,C_\beta,\,a_{\sigma^2},\,b_{\sigma^2}$ so that $Q$ puts mass on reasonable values of the $p+1$ dimensional parameters $\left(\tilde{\beta}_g^\top,\tilde{\sigma}^2_g\right)$. First, estimates are computed for each gene independently by ordinary least squares. The hierarchical mean, $m_\beta$ is chosen so the each component, $m_{\beta,j}$, is equal to the median of the estimates for $\beta_{g,j}$. The diagonal elements of the prior covariance matrix, $C_{jj}$, are chosen to be 4 times the sample variance of the $\beta_{g,j}$. The parameters of the inverse gamma are chosen by matching first and second moments, treating the estimates for $\sigma^2_g$ as data.
+
+This can be though of as an empirical Bayes approach. Alternatively, one could also select values based on prior experience. In any case, using informative or weakly informative priors for is important; if $Q$ is chose to be diffuse, that can be overly informative and lead to only few large $\pi_k$ accounting for most of the total probability in the mixture, $\mathcal{P}$ \citep{gelman-book}.
 
 The parameter $\alpha$ plays an important role in the model, since it helps to determine how quickly the successive elements of $\pi$ decay, i.e. the number of clusters selected by the model. For computational convenience, we choose the conditionally conjugate prior
 
 \begin{figure}
 \includegraphics[width=.5\textwidth]{alphaprior}
-\caption{The number of clusters determined by the model is influenced by the parameter $\alpha$, whose value determines the expected number of clusters prior to seeing the data. The figures above demonstrate the prior distribution of the prior expected number of clusters, $\op{E}(K_{occ})$ for datasets with various number of genes, $G$.}
+\caption{\small The number of clusters determined by the model is influenced by the parameter $\alpha$, whose value determines the expected number of clusters prior to seeing the data. The figures above demonstrate the prior distribution of the prior expected number of clusters, $\op{E}(K_{occ})$ for datasets with various number of genes, $G$.}
 \label{alphaprior}
 \end{figure}
 
@@ -168,7 +172,7 @@ In that paper, the authors use a table of values derived from this formula to de
 
 \begin{figure}
 \includegraphics[width=.8\textwidth]{my_dag}
-\caption{Directed acyclical graphs of the Bayesian nonparametric hierarchical regression model. Panel $(b)$ introduces latent allocation parameters, $\zeta_g$, which decouple the process which partitions the data into clusters from the distribution which provides the unique values, $(\tilde{\beta_k},\tilde{\sigma}_k^2)$ of the cluster parameters. Solid lines indicate distributional dependency, dashed lines indicate deterministic functional relationships.}
+\caption{\small Directed acyclical graphs of the Bayesian nonparametric hierarchical regression model. Panel $(b)$ introduces latent allocation parameters, $\zeta_g$, which decouple the process which partitions the data into clusters from the distribution which provides the unique values, $(\tilde{\beta_k},\tilde{\sigma}_k^2)$ of the cluster parameters. Solid lines indicate distributional dependency, dashed lines indicate deterministic functional relationships.}
 \label{dag}
 \end{figure}
 
@@ -286,7 +290,7 @@ When programming for the CPU, memory accesses tend to be fast. On the GPU, while
 
 Threads are themselves organized into ``warps". When data is read from global memory, it reads not one address at a time, but in chunks to minimize overhead costs. To take advantage of this, consecutively indexed threads should use data from memory at consecutive addresses. When this happens, the reads are ``coalesced". If consecutive threads access addresses that are distant to one another, reads are not coalesced, which will make memory transfer inefficient, hence the program will tend to be slow.
 
-For more specifics on GPU computing for statistics, see \citet{suchard2010}. In the following subsections, we use some examples to demonstrate some instances where parallelism can help to accelerate routine computation.
+For more specifics on GPU computing for statistics, see \citet{suchard}. In the following subsections, we use some examples to demonstrate some instances where parallelism can help to accelerate routine computation.
 
 \subsection{Routines}
 \label{sec:routines}
@@ -306,7 +310,7 @@ On the GPU, individual processors are slow, and asynchronous tasks can result in
 
 \begin{figure}
 \includegraphics[width=\textwidth]{diagram}
-\caption{Diagram illustrating Parallel-Reduce and Parallel-Scan for an array of length $2^3=8$. Values in each row indicate the value after completing a step in the outer loop indicated by ``$d=x$''. $s_{i:j}$ denotes a sum of the original elements, $s_{i:j}=\sum_{k=i}^j a_k$. Arrows pointing down indicate that the previous value is carried forward from the previous step. Arrows pointing right indicate that the value in the left position increments the value previously contained in the right position. Arrows pointing left indicate that the value is copied from right to left. Parallel-Reduce results in the sum of all the original elements being contained in the right-most position. Parallel-Scan uses the partial sums produced as a side-effect of Parallel-Reduce to produce the result that each position holds the sum of the original elements to the left.}
+\caption{\small Diagram illustrating Parallel-Reduce and Parallel-Scan for an array of length $2^3=8$. Values in each row indicate the value after completing a step in the outer loop indicated by ``$d=x$''. $s_{i:j}$ denotes a sum of the original elements, $s_{i:j}=\sum_{k=i}^j a_k$. Arrows pointing down indicate that the previous value is carried forward from the previous step. Arrows pointing right indicate that the value in the left position increments the value previously contained in the right position. Arrows pointing left indicate that the value is copied from right to left. Parallel-Reduce results in the sum of all the original elements being contained in the right-most position. Parallel-Scan uses the partial sums produced as a side-effect of Parallel-Reduce to produce the result that each position holds the sum of the original elements to the left.}
 \label{scan-illustration}
 \end{figure}
 
@@ -358,7 +362,7 @@ In practice, there are physical constraints that require modifications to Parall
 
 Both Parallel-Reduce and Parallel-Scan presented above require $O(\log_2(n))$ steps compared to the $O(n)$ required for a serial implementation. 
 %According to \citet{blelloch1990}, if $P$ processors are available, the time required to scan $n$ elements is $O(n/P + \log_2P)$. 
-The actual speed-up attained depends on hardware and implementation. \citet{harris-scan} implemented Parallel-Scan for GPUs based on the implementation in \citet{blelloch1990} and observed maximum speedups of 5 times over an optimized serial CPU implementation. The advantage of the GPU implementation increased with $n$ and then leveled off, acheiving its best performance on arrays with over 1 million elements. \citet{sengupta2008} implemented a variant of Parallel-Scan that is less efficient in that it requires a larger number of operations, but reduces the number of steps from $2\log_2(n)$ to $\log_2(n)$. They reported speedups of nearly $2\times$ compared to similar implementations based on Parallel-Scan. More recently, \citet{ha2013} offered an implementation based on an algorithm that is a hybrid of the two mentioned. They reported speedups of about $1.5\times$ when compared to the implementation of \citet{sengupta}.
+The actual speed-up attained depends on hardware and implementation. \citet{harris-scan} implemented Parallel-Scan for GPUs based on the implementation in \citet{blelloch1990} and observed maximum speedups of 5 times over an optimized serial CPU implementation. The advantage of the GPU implementation increased with $n$ and then leveled off, acheiving its best performance on arrays with over 1 million elements. \citet{sengupta2008} implemented a variant of Parallel-Scan that is less efficient in that it requires a larger number of operations, but reduces the number of steps from $2\log_2(n)$ to $\log_2(n)$. They reported speedups of nearly $2\times$ compared to similar implementations based on Parallel-Scan. More recently, \citet{ha2013} offered an implementation based on an algorithm that is a hybrid of the two mentioned. They reported speedups of about $1.5\times$ when compared to the implementation of \citet{sengupta2008}.
 
 Parallel scans are used in various ways in our MCMC algorithm. For example, the calculation of cumulative probabilities to sample from categorical distributions in step 1 computes the cumulative sum -- on the log scale for numerical stability -- using $\log(e^{v_1}+e^{v_2})$ as the binary operator.
 % For a thorough treatment see \citet{blelloch1990}, and for implementation details in CUDA, see \citet{harris-scan}.
@@ -483,100 +487,54 @@ We also save and return several low-dimensional parameters which provide some in
 
 \section{Simulation Study}
 \label{sec:timing}
-To assess the time per iteration and time to convergence, we simulated data and sampled from the posterior using our algorithm. Seconds per iteration was calculated by dividing the total time during the sampling phase (after burn-in and initialization) by the number of iterations to obtain one measure of this variable for each simulated data set. The time required to obtain a sufficient number of samples depends not only on the time per iteration, but also the number of MCMC samples required to obtain an ``effective sample" after correcting for the autocorrelation of the chain. Therefore, we also considered seconds per effective sample.
+To assess the time per iteration and time to convergence, we simulated data and sampled from the posterior using our algorithm. Seconds per iteration was calculated by dividing the total time during the sampling phase (after initialization and burn-in) by the number of sampling iterations to obtain one measure of this variable for each simulated data set. The time required to obtain a sufficient number of samples depends not only on the time per iteration, but also the number of MCMC samples required to obtain an ``effective sample" after correcting for the autocorrelation of the chain. Therefore, we also considered seconds per effective sample, where the number of effective samples was calculated in R using the `coda' package \cite{plummer}.
 
-We identified several factors that could potentially impact the running time: the dimension of the regression coefficients, $p$, the number of groups, $G$, and truncation limit, $K$. We held the sample size proportional to the dimension of the problem, $N=4p$. For the simulations, we first generated a distribution $P$ (as in Eq. \ref{eq:P}). We did this by first producing $K_t=\lfloor \sqrt{G}\rfloor$ cluster components, $\tilde{\beta}_k$, which were generated independently from a multivariate normal distribution with diagonal covariance. We chose to have the variance decrease with the dimension; this decision was somewhat arbitrary, but is consistent with empirical observation that the proportion of significant effects is often inversely related to the dimension of the design matrix in regression. The cluster variances, $\tilde{\sigma^2}_k$ were generated independently from a gamma distribution. The gene-specific coefficients, $\beta_g$ and variances, $\sigma^2_g$, were chosen by drawing an index $k$ uniformly with replacement from the set $\{1,...,K_t\}$. Finally, conditional on $(\beta_g,\sigma^2_g)$, log-expression data were generated from the normal distribution as in Equation \ref{eq:data}.
+We identified several factors that could potentially impact the running time: the dimension of the regression coefficients, $p$, the number of groups, $G$, and truncation limit, $K$. The sample size was chosen to be proportional to the $p$, $N=4p$. Two simulated data sets were generated and analyzed for each combination of $p=2,4,6$, $G=2^12,2^13,2^14$ and $K=2^12,2^11,2^12$.
 
-In particular, we focus on the samping for $\alpha$, both for simplicity and because it tends to reflect changes in the overall behavior of the Gibbs sampler.
+For the simulations, we first generated a distribution $P$ (as in Eq. \ref{eq:P}). We did this by first producing $K_t=\lfloor \sqrt{G}\rfloor$ cluster components, $\tilde{\beta}_k$, which were generated independently from a multivariate normal distribution with diagonal covariance $C$. We chose to have the variance decrease with the dimension, $C_{jj} = 3/j^2$. This decision was somewhat arbitrary, but is consistent with empirical observation that the proportion of significant effects is often inversely related to the dimension of the design matrix in regression. The cluster variances, $\tilde{\sigma^2}_k$ were generated independently from a gamma distribution. The gene-specific coefficients, $\beta_g$ and variances, $\sigma^2_g$, were chosen by drawing an index $k$ uniformly with replacement from the set $\{1,...,K_t\}$. Finally, conditional on $(\beta_g,\sigma^2_g)$, log-expression data were generated from the normal distribution as in Equation \ref{eq:data}.
 
-We work with simulated data and consider three factors: $G$, the number of genes, $K$, the truncation limit, and $p$, the dimension of $\beta_g$. For each combination of the levels of these three factors we simulated data as shown below.
+The prior distributions used to analyze the simulated data were set to the true values for $m_\beta = m$, and $C_\beta = C$. The inverse gamma parameters $a_\sigma^2$ and $b_\sigma^2$ were both set to 1. Note that $\tilde{\sigma}^2_k$ come from a gamma distribution, rather than an inverse gamma, to avoid very large values, as the inverse gamma has a much heavier tail. The prior for $\alpha$ is the one described in section \ref{sec:model}, with the prior expectation close or equal to $K_t$.depend on the independent estimates of the gene-specific parameters and the number of genes as described in Section \ref{sec:inference}.
+
+For simplicity, we chose to focus on the effective number of samples for $\alpha$ because it depends on $\pi_K$, a parameter which is sensitive to changes in the number of occupied clusters and the maximum occupied cluster index. Thus, we expect that the efficiency of sampling for alpha is a reasonable proxy for the overall efficiency of the sampler.
 
 \paragraph{Cluster parameters}
 Let $K_{t} = \op{floor}(G^{0.5})$. For $k=1 \ldots K_{t}$, draw $\tilde{\beta}_k \sim \op{Normal}(0, C),\; \tilde{\sigma^2}_k \sim \op{Gamma}(1, 1)$, where $C=\op{diag}(3, 3/2^2, \ldots, 3/p^2)$.
   
-\paragraph{Allocation to clusters} For $g=1,\ldots G$, draw $\zeta_g \sim \op{Categorical}(1/K_{occ},\ldots,1/K_{occ})$. 
+\paragraph{Allocation to clusters} For $g=1,\ldots G$, draw $\zeta_g \ind \op{Discrete-Uniform}(1,K_t)$. 
   
-\paragraph{Conditionally normal data}
+\paragraph{Simulated data}
  Let $X = \begin{pmatrix} 1_{4 \times 1} & 0_{1\times(p-1)}\\
-                                 1_{4(p-1) \times 1} & I_{(p-1)\times(p-1)} \otimes 1_{4\times 1} \end{pmatrix}$, where $\otimes$ is the Kronecker product. Draw $y_{g} \sim \op{Normal}(X\tilde{\beta}_{\zeta_g}, \tilde{\sigma}^2_{\zeta_g}).$
+                                 1_{4(p-1) \times 1} & I_{(p-1)\times(p-1)} \otimes 1_{4\times 1} \end{pmatrix}$, where $\otimes$ is the Kronecker product. Draw $y_{g} \sim \op{Normal}(X\tilde{\beta}_{\zeta_g}, \tilde{\sigma}^2_{\zeta_g})$, where $y_{g}=\left(y_{g1},\ldots,y_{gN}\right)^\top$.
 
+The left panel of Figure \ref{timing} shows the average time per iteration at each simulation setting. Note that both axes are on the log scale. As expected, there is an increase in cost associated with larger data sets. We see a substantially larger increase in running time for doubling the truncation limit, $K$, than for doubling the number of groups, $G$; this is likely because more of the computational steps depend on $K$ than depend on $G$. The cost associated with increasing the dimension of the regression, $p$, appears to be relatively small. Increases in $p$ are associated primarily with a larger amount of work required for individual threads, while increases in $G$ and $K$ incur a cost of many additional threads.
 
-In this experiment we set the prior to the true values for $m_\beta = m$, and $C_\beta = C$ and set $a_\sigma^2=1$ and $b_\sigma^2=1$. Note that the true values $\sigma^2_k$ come from a gamma distribution, rather than an inverse gamma, which would have lead to dispropotionately high error variances for some genes. The prior for $\alpha$ is the one described in section \ref{sec:model}, with the prior expectation close or equal to the true value.
-
-Results of the simulation study are presented in Table \ref{tab:neff-alpha}.
-
-% latex table generated in R 3.4.1 by xtable 1.8-2 package
-% Mon Aug 28 15:21:01 2017
-\begin{table}[ht]
-\caption{Number of seconds per effective sample for $\alpha$. Each value is computed from a 50,000 MCMC iterations (a single chain).}
-\label{tab:neff-alpha}
-\centering
-\begin{tabular}{rrrrrr}
-
-  &   & \multicolumn{3}{c}{K}\\
-  \hline
-G & p & 1024 & 2048 & 4096 \\ 
-  \hline
-4096  & 2 & 17 & 30 & 241 \\ 
-      & 4 & 9 & 8 & 127 \\ 
-      & 6 & 3 & 4 & 140 \\ 
-8192  & 2 & 28 & 40 & 231 \\ 
-      & 4 & 11 & 19 & 111 \\ 
-      & 6 & 7 & 21 & 35 \\ 
-16384 & 2 & 25 & 56 & 167 \\ 
-      & 4 & 13 & 25 & 150 \\ 
-      & 6 & 8 & 17 &  \\ 
-32768 & 2 & 66 & 101 & 267 \\ 
-      & 4 & 6 & 46 & 113 \\ 
-      & 6 & 12 & 31 & 108 \\ 
-   \hline
-\end{tabular}
-
-\end{table}
-
-% \begin{figure}
+% \begin{figure}[!h]
 % \centering
-% \includegraphics[width=.9\textwidth]{neff-marginal}
-% \caption{Number of effective samples for $\alpha$ marginalizing over the third factor (left:K, right:G).}
-% \label{fig:neff-marginal}
+% \includegraphics[width=.5\textwidth]{raw-time3}
+% \caption[Average number of seconds per MCMC sample]{\scriptsize Left: Average seconds required per MCMC sample across for two simulated datasets at each level of K, the truncation limit, G, then number of genes, and p , the dimension of regression coefficient. K has the largest impact on computation time, followed by G. The effect of p is small over the range considered. Right: Average seconds per effective sample across for two simulated datasets at each level of K, the truncation limit, G, then number of genes, and p , the dimension of regression coefficient. Interestingly, the efficiency in sampling for $\alpha$ increases with p in our simulations. This might be explained by an increased separation between clusters, leading to greater stability in the partition defined by the allocation parameters.}%
+% \label{raw-time}
 % \end{figure}
 
-\begin{figure}[ht]
+\begin{figure}[!h]
 \centering
-\includegraphics[width=.9\textwidth]{raw-time2}
-\caption[Average number of seconds per MCMC sample]{Left: Average seconds required per MCMC sample across for two simulated datasets at each level of K, the truncation limit, G, then number of genes, and p , the dimension of regression coefficient. K has the largest impact on computation time, followed by G. The effect of p is small in the range considered. For large K and small G, the cost of increasing p appears to be offset by the smaller number of occupied clusters in a higher dimensional space.}%
-\label{raw-time}
+\includegraphics[width=\textwidth]{comb-timing}
+\caption[Average number of seconds per MCMC sample]{\small Left: Average seconds required per MCMC sample across for two simulated datasets at each level of K, the truncation limit, G, then number of genes, and p , the dimension of regression coefficient. K has the largest impact on computation time, followed by G. The effect of p is small over the range considered. Right: Average seconds per effective sample across for two simulated datasets at each level of K, the truncation limit, G, then number of genes, and p , the dimension of regression coefficient. Interestingly, the efficiency in sampling for $\alpha$ increases with p in our simulations. This might be explained by an increased separation between clusters, leading to greater stability in the partition defined by the allocation parameters.}%
+\label{timing}
 \end{figure}
 
-\begin{figure}[ht]
-\centering
-\includegraphics[width=.9\textwidth]{eff-time2}
-\caption[Average seconds per effective sample]{Left: Average seconds per effective sample across for two simulated datasets at each level of K, the truncation limit, G, then number of genes, and p , the dimension of regression coefficient. Interestingly, the efficiency in sampling for $\alpha$ increases with p in our simulations. This might be explained by an increased separation between clusters, leading to greater stability in the partition defined by the allocation parameters.}%
-\label{eff-time}
-\end{figure}
+While the trends in time per iteration are fairly obvious, the results for time per effective sample are less so. This is expected, since the number of effective samples is an estimate, introducing another source of variability. The right panel of Figure \ref{timing} shows the average time per effective sample at simulation setting. While some trends reflect those seen in the raw time per iteration, there are some notable differences. The most important factor is still $K$, but $p$ has a much larger impact. Also, contrary to the previous figure, increases in $p$ are associated with a reduction in time required.
 
-% latex table generated in R 3.4.1 by xtable 1.8-2 package
-% Wed Sep 06 08:56:57 2017
-\begin{table}[ht]
-\caption[Estimated exponentiated coefficients for the linear regression model: (model)]{Estimated exponentiatedcoefficients for the linear regression model: \\\hspace{\textwidth}\(\log_2$(sec. per eff. sample)$=\beta_0 + \log_2(K)\beta_1 + \log_2(G)\beta_2 + \log_2(p)\beta_3 + \epsilon\). The exponentiated values are a multiplicative effect on the predicted median seconds per effective sample for each doubling in the corresponding predictor (K,G or p).}
-%   Estimated coefficients for the linear regression model,.}
-\label{tab:regression}
-\centering
-\begin{tabular}{rrrr}
-  \hline
- & Est. & lower 95\% & upper 95\% \\ 
-  \hline
-$2^{\beta_1}$ & 3.251 & 2.807 & 3.765 \\ 
-  $2^{\beta_2}$ & 1.171 & 1.011 & 1.357 \\ 
-  $2^{\beta_3}$ & 0.485 & 0.404 & 0.582 \\ 
-   \hline
-\end{tabular}
-\end{table}
+A possible explanation for this observation goes like this: In our simulation setup, the true number of clusters grows with $G$, but not with $p$. Also, the total number of samples does increase with $p$. By holding the number of clusters fixed and increasing the sample size with which to estimate their locations, while at the same time moving the clusters apart (by increasing the dimension of the parameter space), one expects that the partition of groups into clusters becomes less difficult. Since we consider the effective sample size for $\alpha$ to be a proxy for the stability of the random partition separating groups into clusters, it follows then that increases in $p$ should increase the stability of both the random partition, as well as the parameter $\alpha$.
 
-Table \ref{tab:regression} shows the result of fitting a linear regression of $\log_2(\frac{\mbox{seconds}}{\mbox{effective sample}}$ on $\log_2(K)$, $\log_2(G)$ and $\log_2(p)$. The estimated coefficients of this additive model suggest that seconds per effective sample grows sublinearly in $G$, approximately quadratic in $K$ and inversely with $V$.
+% \begin{figure}[!h]
+% \centering
+% \includegraphics[width=.9\textwidth]{eff-time2}
+% \caption[Average seconds per effective sample]{Left: Average seconds per effective sample across for two simulated datasets at each level of K, the truncation limit, G, then number of genes, and p , the dimension of regression coefficient. Interestingly, the efficiency in sampling for $\alpha$ increases with p in our simulations. This might be explained by an increased separation between clusters, leading to greater stability in the partition defined by the allocation parameters.}%
+% \label{eff-time}
+% \end{figure}
 
 \iftoggle{thesis}{
-  An inverse relationship between computation time and the dimension, $p$, may seem counterintutive; however, because the posterior variability of $\alpha$ depends on the stability of the the partition of genes into clusters, and as $p$ increases so does the distance between clusters, $\alpha$, like the partition, has fewer viable moves. This phenomenon is also on display in Figure \ref{alpha-trace} where the normalized traceplots seem to show shorter and less extreme excursions in the higher dimensions.
+Figure \ref{alpha-trace} shows normalized traceplots for $\alpha$. These show shorter and less extreme excursions at higher values of $p$, which is consistent with this hypothesis.
   
   \begin{figure}[ht]
   \centering
@@ -585,6 +543,66 @@ Table \ref{tab:regression} shows the result of fitting a linear regression of $\
   \label{alpha-trace}
   \end{figure}
 }
+
+% Results of the simulation study are presented in Table \ref{tab:neff-alpha}.
+% 
+% % latex table generated in R 3.4.1 by xtable 1.8-2 package
+% % Mon Aug 28 15:21:01 2017
+% \begin{table}[ht]
+% \caption{Number of seconds per effective sample for $\alpha$. Each value is computed from a 50,000 MCMC iterations (a single chain).}
+% \label{tab:neff-alpha}
+% \centering
+% \begin{tabular}{rrrrrr}
+% 
+%   &   & \multicolumn{3}{c}{K}\\
+%   \hline
+% G & p & 1024 & 2048 & 4096 \\ 
+%   \hline
+% 4096  & 2 & 17 & 30 & 241 \\ 
+%       & 4 & 9 & 8 & 127 \\ 
+%       & 6 & 3 & 4 & 140 \\ 
+% 8192  & 2 & 28 & 40 & 231 \\ 
+%       & 4 & 11 & 19 & 111 \\ 
+%       & 6 & 7 & 21 & 35 \\ 
+% 16384 & 2 & 25 & 56 & 167 \\ 
+%       & 4 & 13 & 25 & 150 \\ 
+%       & 6 & 8 & 17 &  \\ 
+% 32768 & 2 & 66 & 101 & 267 \\ 
+%       & 4 & 6 & 46 & 113 \\ 
+%       & 6 & 12 & 31 & 108 \\ 
+%    \hline
+% \end{tabular}
+% 
+% \end{table}
+
+% \begin{figure}
+% \centering
+% \includegraphics[width=.9\textwidth]{neff-marginal}
+% \caption{Number of effective samples for $\alpha$ marginalizing over the third factor (left:K, right:G).}
+% \label{fig:neff-marginal}
+% \end{figure}
+% latex table generated in R 3.4.1 by xtable 1.8-2 package
+% Wed Sep 06 08:56:57 2017
+
+Table \ref{tab:regression} shows the result of fitting a linear regression of $\log_2(\frac{\mbox{seconds}}{\mbox{effective sample}}$ on $\log_2(K)$, $\log_2(G)$ and $\log_2(p)$. The estimated coefficients of this model suggest that seconds per effective sample grows sublinearly in $G$, approximately quadratic in $K$ and inversely with $V$.
+
+\begin{table}
+\caption[Estimated exponentiated coefficients for the linear regression model: (model)]{\small Estimated exponentiatedcoefficients for the linear regression model: \\\hspace{\textwidth}\(\log_2$(sec. per eff. sample)$=\beta_0 + \log_2(K)\beta_1 + \log_2(G)\beta_2 + \log_2(p)\beta_3 + \epsilon\). The exponentiated values are a multiplicative effect on the predicted median seconds per effective sample for each doubling in the corresponding predictor (K,G or p).}
+\vspace{0.5cm}
+%   Estimated coefficients for the linear regression model,.}
+\label{tab:regression}
+\centering
+\begin{tabular}{ccccc}
+  \hline
+factor &mult. effect& Est. & lower 95\% & upper 95\% \\ 
+  \hline
+K & $2^{\beta_1}$ & 3.3 & 2.8 & 3.8 \\ 
+G & $2^{\beta_2}$ & 1.2 & 1.0 & 1.4 \\ 
+p & $2^{\beta_3}$ & 0.5 & 0.4 & 0.6 \\ 
+   \hline
+\end{tabular}
+\end{table}
+
 
 \section{Example: Paschold maize data}
 \label{sec:analysis}
@@ -600,29 +618,37 @@ For computational reasons, we assume a normal model for the data after transform
 $$\mbox{transformed log-count in column }i = \log (\mbox{original count in column }i+1) + \log(c_i)$$. \iftoggle{thesis}{The result after applying these steps to the data in Table \ref{tab:data} are shown in Table \ref{tab:data-transformed}}.
 
 \subsection{Model}
-We let $Y_{gci} = \log \frac{Z_{gci}+1}{C_{ci}}$, where $Z_{gi}$ is the total read count for replicate $i$ of genotype $c$. $C_{ci}$ is a normalizing constant which is used to adjust for differences in the total RNA content in each sample. We estimate the normalizing constants using the trimmed mean of M-values procedure \cite{robinson2010}. Our design matrix for each gene (collapsing identical rows) is
+We let $Y_{gci} = \log \frac{Z_{gci}+1}{C_{ci}}$, where $Z_{gi}$ is the total read count for replicate $i$ of genotype $c$. $C_{ci}$ is a normalizing constant which is used to adjust for differences in the total RNA content in each sample. We estimate the normalizing constants using the trimmed mean of M-values procedure \cite{robinson2010}. Our design matrix for each gene is
 
 \begin{equation*}
 \begin{blockarray}{rlrrr}
-  && \mbox{(intercept) }\beta_1 & \mbox{(Mo17) }\beta_2 & \mbox{(flow cell) }\beta_3\\
+  Sample & \mbox{(intercept) }\beta_1 & \mbox{(Mo17) }\beta_2 & \mbox{(flow cell) }\beta_3\\
   \begin{block}{rl(rrr)}
-  \mbox{B73}    &\mbox{reps:1,2} & 1 & 0 & 0\\
-  \mbox{B73}    &\mbox{reps:3,4} & 1 & 0 & 1\\
-  \mbox{Mo17}   &\mbox{reps:1,2} & 1 & 1 & 0\\
-  \mbox{Mo17}   &\mbox{reps:3,4} & 1 & 1 & 1\\
+  \mbox{B73,1} & 1 & 0 & 0\\
+  \mbox{B73,2} & 1 & 0 & 0\\
+  \mbox{B73,3} & 1 & 0 & 1\\
+  \mbox{B73,4} & 1 & 0 & 1\\
+  \mbox{Mo17,1} & 1 & 1 & 0\\
+  \mbox{Mo17,2} & 1 & 1 & 0\\
+  \mbox{Mo17,3} 1 & 1 & 1\\
+  \mbox{Mo17,4} 1 & 1 & 1\\
   \end{block}
-\end{blockarray}
+\end{blockarray}.
 \label{design}
 \end{equation*}
 
-We fit the model using four independent chains. They were initialized by setting unique random seeds and running 1000 iterations, then reordering the cluster indices by $\pi$. 50,000 iterations were run for each chain after 10,000 iterations of burn-in. Potential scale reduction factors are shown in figure \ref{rhat}. Values close to 1 are consistent with convergence; 1.1 has been suggested as a cut-off. While some parameters exceeded 1.1, the vast majority were close to 1.
-
+We fit the model using four independent chains. They were initialized by setting unique random seeds and running 1000 iterations, then reordering the cluster indices by $\pi$. 50,000 iterations were run for each chain after 10,000 iterations of burn-in. 
+\iftoggle{thesis}{
+Potential scale reduction factors are shown in figure \ref{rhat}. Values close to 1 are consistent with convergence; 1.1 has been suggested as a cut-off. While some parameters exceeded 1.1, the vast majority were close to 1.
 \begin{figure}
 \centering
 \includegraphics[width=.8\textwidth]{rhats-param}
 \caption{Gelman-Rubin potential scale reduction factors for all gene-specific parameters.}
 \label{rhat}
 \end{figure}
+}{
+To check for convergence, potential scale reduction factors (`R-hats') were estimated for all gene-specific parameters. While a few parameters had R-hats that exceeded 1.1, the vast majority were less than 1.01. Values close to 1 are consistent with convergence, while 1.1 has been suggested as a threshold.
+}
 
 \subsection{Comparison of methods}
 In addition to our method, we also fit the data using two other model: a linear mixed-effects model, treating gene-specific parameters as random effects, and all genes independently using least squares. For every method we parameterized the gene-specific mean with an intercept, an additive effect for the $Mo17$ genotype, and an additive effect for flow cell 2. The gene independent model, which produces a gene-specific variance estimate borrows no information across genes. The linear mixed-effects model assumes a bivariate normal distribution for all the gene-specific mean parameters. Because the covariance and the mean of this distribution is estimatated from the data, this model does borrow information across genes (since software assumes a zero mean for the random gene effects, we also estimate a fixed effect which corresponds to the unknown mean.) This method assumes homogeneity of the error variance across genes.
@@ -630,7 +656,7 @@ In addition to our method, we also fit the data using two other model: a linear 
 \begin{figure}
 \centering
 \includegraphics[width=.9\textwidth]{method-compare-std}
-\caption{Comparisons of the parameter estimates under each method.}
+\caption{\small Comparisons of the parameter estimates under each method.}
 \label{method-compare}
 \end{figure}
 Figure  \ref{method-compare} shows a comparison of the estimates under three models. While there is agreement about the gene-specific intercepts, there is noticable shrinkage toward the global mean for the half-difference in the linear mixed-effects model. This can be explained by the long tail of these estimates relative to a normal distribution.
@@ -649,14 +675,14 @@ Figure \ref{pairs-3-methods} displays pairs of parameter estimates obtained from
 \begin{figure}[ht]
 \centering
 \includegraphics[width=.65\textwidth]{mean-variance}
-\caption{Bivariate histogram of point estimates across genes, using hexagonal binning. Relative to the independent estimates obtained by least-squares ("OLS"), the Bayesian nonparametric model shrinks estimates toward an underlying distribution learned from the data.}
+\caption{\small Bivariate histogram of point estimates across genes, using hexagonal binning. Relative to the independent estimates obtained by least-squares ("OLS"), the Bayesian nonparametric model shrinks estimates toward an underlying distribution learned from the data.}
 \label{mean-variance}
 \end{figure}
 
 \begin{figure}[ht]
 \centering
 \includegraphics[width=\textwidth]{difference_histograms}
-\caption{Difference of histograms of point estimates for gene-specific parameters under different models. Both BNP and LMM show shrinkage toward zero relative to OLS. The shrinkage with LMM is monotonic toward zero, while the shrinkage with BNP varies across the parameter space.}
+\caption{\small Difference of histograms of point estimates for gene-specific parameters under different models. Both BNP and LMM show shrinkage toward zero relative to OLS. The shrinkage with LMM is monotonic toward zero, while the shrinkage with BNP varies across the parameter space.}
 \label{diff-hist}
 \end{figure}
 
