@@ -31,7 +31,7 @@ initialize_chain <- function(seed, K, n.iter, methodPi, idx=0:9){
                                  C = C))
   
   contr$n_iter <- as.integer(n.iter)
-  contr$thin <- as.integer(5)
+  contr$thin <- as.integer(100)
   contr$warmup <- as.integer(10000)
   contr$idx_save <- 0:9
   contr$n_save_P <- as.integer(100)

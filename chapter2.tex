@@ -621,17 +621,17 @@ $$\mbox{transformed log-count in column }i = \log (\mbox{original count in colum
 We let $Y_{gci} = \log \frac{Z_{gci}+1}{C_{ci}}$, where $Z_{gi}$ is the total read count for replicate $i$ of genotype $c$. $C_{ci}$ is a normalizing constant which is used to adjust for differences in the total RNA content in each sample. We estimate the normalizing constants using the trimmed mean of M-values procedure \cite{robinson2010}. Our design matrix for each gene is
 
 \begin{equation*}
-\begin{blockarray}{rlrrr}
+\begin{blockarray}{rrrr}
   Sample & \mbox{(intercept) }\beta_1 & \mbox{(Mo17) }\beta_2 & \mbox{(flow cell) }\beta_3\\
-  \begin{block}{rl(rrr)}
+  \begin{block}{r(rrr)}
   \mbox{B73,1} & 1 & 0 & 0\\
   \mbox{B73,2} & 1 & 0 & 0\\
   \mbox{B73,3} & 1 & 0 & 1\\
   \mbox{B73,4} & 1 & 0 & 1\\
   \mbox{Mo17,1} & 1 & 1 & 0\\
   \mbox{Mo17,2} & 1 & 1 & 0\\
-  \mbox{Mo17,3} 1 & 1 & 1\\
-  \mbox{Mo17,4} 1 & 1 & 1\\
+  \mbox{Mo17,3} & 1 & 1 & 1\\
+  \mbox{Mo17,4} & 1 & 1 & 1\\
   \end{block}
 \end{blockarray}.
 \label{design}
@@ -639,7 +639,7 @@ We let $Y_{gci} = \log \frac{Z_{gci}+1}{C_{ci}}$, where $Z_{gi}$ is the total re
 
 We fit the model using four independent chains. They were initialized by setting unique random seeds and running 1000 iterations, then reordering the cluster indices by $\pi$. 50,000 iterations were run for each chain after 10,000 iterations of burn-in. 
 \iftoggle{thesis}{
-Potential scale reduction factors are shown in figure \ref{rhat}. Values close to 1 are consistent with convergence; 1.1 has been suggested as a cut-off. While some parameters exceeded 1.1, the vast majority were close to 1.
+Potential scale reduction factors are shown in figure \ref{rhat}. Values close to 1 are consistent with convergence; 1.1 has been suggested as a threshold \citep{gelman-book-rhat}. While some parameters exceeded 1.1, the vast majority were close to 1.
 \begin{figure}
 \centering
 \includegraphics[width=.8\textwidth]{rhats-param}
@@ -647,7 +647,7 @@ Potential scale reduction factors are shown in figure \ref{rhat}. Values close t
 \label{rhat}
 \end{figure}
 }{
-To check for convergence, potential scale reduction factors (`R-hats') were estimated for all gene-specific parameters. While a few parameters had R-hats that exceeded 1.1, the vast majority were less than 1.01. Values close to 1 are consistent with convergence, while 1.1 has been suggested as a threshold.
+To check for convergence, potential scale reduction factors (`R-hats') were estimated for all gene-specific parameters. While a few parameters had R-hats that exceeded 1.1, the vast majority were less than 1.01. Values close to 1 are consistent with convergence, while 1.1 has been suggested as a threshold \citep{gelman-book-rhat}.
 }
 
 \subsection{Comparison of methods}
@@ -661,25 +661,7 @@ In addition to Equation \ref{eq:data}, assume $\sigma^2_g = \sigma^2$ for all $g
 
 In contrast to the BNP model, the gene independent model puts no assumptions on the distribution of gene-specific parameters and borrows no information across genes. The hierarchical linear model assumes that the $\beta_g$ parameters are realizations of a multivariate normal distribution. This allows for borrowing of information, since $\mu$ and $\Sigma$ are estimated using all of the data and inference for $\beta_g$ is moderated by them.
 
-Since the hierarchical linear model restricts $\mathcal{P}$ to the family of multivariate normal distributions, the effect of borrowing information via $\mathcal{P}$ is to pull all estimates for $\beta_g$ toward a common value. In Figure \ref{pairs-3-methods}, by comparing the bivariate histograms of the point estimates obtained by the hierarchical model (middle column) to the gene independent model (left column), there is detectable shrinkage. This shrinkage preserves the shape of the distribution of estimates obtained by the gene independent model while reducing the magnitude of the estimates by shrinking them toward a common value. By comparison, of the point estimates obtained by the BNP model (posterior means), some are shrunk while some are not and the degree of shrinkage in many cases is more dramatic. For example, in the three-way comparison of the bottom panels, the BNP shows aggressive shrinkage, relative to the hierarchical model, of the estimates of Mo17 toward zero for those genes with the most negative flow cell effects. Figure \ref{local-shrink} shows this phenomena in greater detail. The left-panels show a zoomed in version of the lower-left plot in Figure \ref{pairs-3-methods}, with a bounding box identifying a region of interest. The next plot to the right shows the gene independent estimates from that region, while the last two plots in the row show the corresponding estimates for the hierarchical and BNP models. The BNP estimates are much less predictable, but they show clear local shrinkage toward regions with high density in the left-most plot. The seemingly erratic behavior is related to the two additional dimensions in which are ignored in these plots, but in which the shrinkage is being applied.
-
-\begin{figure}
-\centering
-\includegraphics[width=.9\textwidth]{local_shrink}
-\caption{\small Comparisons of the parameter estimates under each method.}
-\label{method-compare}
-\end{figure}
-
-
-\begin{figure}
-\centering
-\includegraphics[width=.9\textwidth]{method-compare-std}
-\caption{\small Comparisons of the parameter estimates under each method.}
-\label{method-compare}
-\end{figure}
-Figure  \ref{method-compare} shows a comparison of the estimates under three models. While there is agreement about the gene-specific intercepts, there is noticable shrinkage toward the global mean for the half-difference in the linear mixed-effects model. This can be explained by the long tail of these estimates relative to a normal distribution.
-
-Figures \ref{pairs-3-methods} and \ref{diff-hist} show slices in two dimensions of the joint distribution of point estimates provided by the three models, and differences of these empirical densities. Figure \ref{diff-hist} reveals a key distinction between BNP and LMM, that the shrinkage under LMM is monotonic toward a single point, whereas BNP shrinks estimates in different ways depending on their general location in the parameter space. This is most clearly illustrated by the third row, which compares the bivariate densities of point estimates of $(\beta_{g2},\beta_{g3})$ under the different models. The estimates obtained by BNP are shrunken toward two perpendicular line segments which follow the center of the distribution of the OLS estimates. The normality assumption of LMM leads to the points along the vertical axis being all shrunk monotonically toward the origin. The bottom-left plot in figure \ref{diff-hist} shows that estimates of $\sigma_g$ are clearly shrunken toward a curve which can be interpreted as an estimate of a latent mean-variance trend across genes. This is significant, as compensating for such a trend is a recognized objective in the analysis of RNA-seq data.
+Since the hierarchical linear model restricts $\mathcal{P}$ to the family of multivariate normal distributions, the effect of borrowing information via $\mathcal{P}$ is to pull all estimates for $\beta_g$ toward a common value. In Figure \ref{pairs-3-methods}, by comparing the bivariate histograms of the point estimates obtained by the hierarchical model (middle column) to the gene independent model (left column), there is detectable shrinkage. This shrinkage preserves the shape of the distribution of estimates obtained by the gene independent model while reducing the magnitude of the estimates by shrinking them toward a common value. By comparison, of the point estimates obtained by the BNP model (posterior means), some are shrunk while some are not and the degree of shrinkage in many cases is more dramatic. For example, in the three-way comparison of the bottom panels, the BNP shows aggressive shrinkage, relative to the hierarchical model, of the estimates of Mo17 toward zero for those genes with the most negative flow cell effects. Figure \ref{local-shrink} shows this phenomena in greater detail. The left-panels show a zoomed in version of the lower-left plot in Figure \ref{pairs-3-methods}, with a bounding box identifying a region of interest. The next plot to the right shows the gene independent estimates from that region, while the last two plots in the row show the corresponding estimates for the hierarchical and BNP models. The BNP estimates are much less predictable, but they show clear local shrinkage toward regions with high density in the left-most plot. %The seemingly erratic behavior is related to the two additional dimensions in which the shrinkage is being applied.
 
 \begin{figure}[ht]
 \centering
@@ -687,6 +669,26 @@ Figures \ref{pairs-3-methods} and \ref{diff-hist} show slices in two dimensions 
 \caption{Histogram of point estimates across genes, showing pairwise comparisons, using hexagonal binning. Relative to the independent estimates obtained by least-squares ("OLS"), the linear mixed-effects model ("LMM") shrinks all estimates toward a common mean, while the Bayesian nonparametric model shrinks estimates toward an underlying distribution learned from the data.}
 \label{pairs-3-methods}
 \end{figure}
+
+\begin{figure}
+\centering
+\includegraphics[width=.9\textwidth]{local_shrink}
+\caption{\small Comparing shrinkage in $\beta_{g2}$ and $\beta_{g3}$ under the hierarchical and BNP models. The each row shows, with a bounding box, a selected region of the parameter space. The left-most plot shows the empirical density of the gene independent estimates; these are isolated in the next plot to the right. The last plots in each row show estimates for the same genes under the hierarchical model and the BNP model, respectively. The hierarchical model shrinks monotonically and preserves most of the relative positioning of the estimates, whereas the BNP model shrinks toward nearby regions with high density (in the left-most plot).}
+\label{method-compare}
+\end{figure}
+
+
+% \begin{figure}
+% \centering
+% \includegraphics[width=.9\textwidth]{method-compare-std}
+% \caption{\small Comparisons of the parameter estimates under each method.}
+% \label{method-compare}
+% \end{figure}
+% Figure  \ref{method-compare} shows a comparison of the estimates under three models. While there is agreement about the gene-specific intercepts, there is noticable shrinkage toward the global mean for the half-difference in the linear mixed-effects model. This can be explained by the long tail of these estimates relative to a normal distribution.
+
+Figure \ref{diff-hist} show slices in two dimensions of the joint distribution of point estimates for $\beta_g$ provided by the three models, and differences of these empirical densities. The biggest differences are in the third row, which compares the bivariate densities of point estimates of $(\beta_{g2},\beta_{g3})$ under the different models. The estimates obtained by BNP are shrunken toward two perpendicular line segments which follow the center of the distribution of the OLS estimates. The normality assumption of LMM leads to the points along the vertical axis being all shrunk monotonically toward the origin. The bottom-left plot in figure \ref{diff-hist} shows that estimates of $\sigma_g$ are clearly shrunken toward a curve which can be interpreted as an estimate of a latent mean-variance trend across genes. This is significant, as compensating for such a trend is a recognized objective in the analysis of RNA-seq data.
+
+
 
 Figure \ref{pairs-3-methods} displays pairs of parameter estimates obtained from the different methods. The top two rows shows slight differences in the joint distribution of the gene-specific mean parameters for OLS when compared with those obtained by LMM. This difference is characterized by a shrinkage of all estimates toward the overall average, which has most noticable impact on the genes which are estimated to be far from that average.
 
