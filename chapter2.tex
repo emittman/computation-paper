@@ -77,28 +77,7 @@ $\mbox{gene}_2$& 414 & 422 & 383 & 416 & 392 & 346 & 402 & 351 \\
 \end{table}
 \iftoggle{thesis}{%
 Because the read count totals are right-skewed, we use a logarithmic transformation of the RNA-seq counts, performing the analysis instead with log counts normalized by the effective library size. The details are given in Section \ref{sec:analysis}. Table \ref{tab:data-transformed} shows the result of this transformation applied to the data in Table \ref{tab:data}.
-
-% latex table generated in R 3.4.2 by xtable 1.8-2 package
-% Tue Oct 17 15:25:11 2017
-\begin{table}[ht]
-\centering
-\caption{\small Same sample of RNA-seq total read counts as in Table \ref{tab:data}, after normalization and transformation. Weighted trimmed mean of M-values normalization was performed to estimate effective library size using the \texttt{calcNormFactors} function in \texttt{edgeR} \cite{edger2010}.}
-\label{tab:data-transformed}
-\vspace{.2in}
-\centering
-\begin{tabular}{lrrrrrrrr}
-  \hline
-& $\mbox{B73}_1$ & $\mbox{B73}_2$ & $\mbox{B73}_3$ & $\mbox{B73}_4$ & $\mbox{Mo17}_1$ & $\mbox{Mo17}_2$ & $\mbox{Mo17}_3$ & $\mbox{Mo17}_4$ \\ 
-  \hline
-$\mbox{gene}_1$ &-9.66 & -9.70 & -9.55 & -9.54 & -14.71 & -14.62 & -15.51 & -15.48 \\ 
-$\mbox{gene}_2$ &-10.13 & -10.03 & -10.09 & -10.06 & -10.13 & -10.16 & -10.20 & -10.31 \\ 
-$\mbox{gene}_3$ &-8.83 & -8.74 & -9.23 & -9.37 & -8.67 & -8.65 & -8.95 & -8.94 \\ 
-$\mbox{gene}_4$ &-13.60 & -13.59 & -14.25 & -14.99 & -13.90 & -12.97 & -13.90 & -14.23 \\ 
-$\mbox{gene}_5$ &-15.47 & -15.38 & -16.04 & -14.99 & -9.24 & -9.16 & -9.15 & -9.41 \\ 
-   \hline
-\end{tabular}
-\end{table}
-}{}
+}
 
 \section{Bayesian nonparametric hierarchical regression model}
 \label{sec:model}
@@ -605,7 +584,7 @@ Figure \ref{alpha-trace} shows normalized traceplots for $\alpha$. These show sh
 % latex table generated in R 3.4.1 by xtable 1.8-2 package
 % Wed Sep 06 08:56:57 2017
 
-Table \ref{tab:regression} shows the result of fitting a linear regression of $\log_2(\frac{\mbox{seconds}}{\mbox{effective sample}}$ on $\log_2(K)$, $\log_2(G)$ and $\log_2(p)$. The estimated coefficients of this model suggest that seconds per effective sample grows sublinearly in $G$, approximately quadratic in $K$ and inversely with $V$.
+Table \ref{tab:regression} shows the result of fitting a linear regression of $\log_2(\mbox{seconds}/\mbox{effective sample}$ on $\log_2(K)$, $\log_2(G)$ and $\log_2(p)$. The estimated coefficients of this model suggest that seconds per effective sample grows sublinearly in $G$, approximately quadratic in $K$ and inversely with $V$.
 
 \begin{table}
 \caption[Estimated exponentiated coefficients for the linear regression model: (model)]{\small Estimated exponentiatedcoefficients for the linear regression model: \\\hspace{\textwidth}\(\log_2$(sec. per eff. sample)$=\beta_0 + \log_2(K)\beta_1 + \log_2(G)\beta_2 + \log_2(p)\beta_3 + \epsilon\). The exponentiated values are a multiplicative effect on the predicted median seconds per effective sample for each doubling in the corresponding predictor (K,G or p).}
@@ -632,34 +611,58 @@ p & $2^{\beta_3}$ & 0.5 & 0.4 & 0.6 \\
 \paragraph{Normalization and transformation}
 For RNA-seq data, column-wise normalization (often referred to as `between-sample' normalization) is required to adjust for systematic differences arising from the sequencing process. These systematic differences obfuscate, and are irrelevant to, the quantities of interest.
 
-For example, the total of all read counts (`library size') for a sample will vary, in part, due to differences in sequencing depth or total read count which lead to some columns having significantly higher total reads than others. A simple fix is to divide, for each sample and gene, by the library size of the sample. Unfortunately, this approach to normalization is problematic because the library size is often driven primarily by a few highly sequenced genes, making this approach too volatile. Fixes to this problem have been proposed; we used the trimmed mean of M-values (TMM) method of \citet{} to obtain an `effective library size'. Other approaches have been proposed; for further discussion, see \citet{oshlack2010rna}.
+For example, the total of all read counts (`library size') for a sample will vary, in part, due to differences in sequencing depth or total read count which lead to some columns having significantly higher total reads than others. A simple fix is to divide, for each sample and gene, by the library size of the sample. Unfortunately, this approach to normalization is problematic because the library size is often driven primarily by a few highly sequenced genes, making this approach too volatile. Fixes to this problem have been proposed; we used the trimmed mean of M-values (TMM) method of \citet{robinson2010} to obtain an `effective library size'. Other approaches have been proposed; for further discussion, see \citet{oshlack2010rna}.
 
 Because the data are non-negative and variability in expression tends to increase with the overall expression,  gene expression data is typically analyzed on a logarithmic scale, with difference in expression being multiplicative. Because of the presence of zeros, we add one to each count before taking logarithms and subtracting the log of the effective library size: $y_{gn} = \log(R_{gn}+1) - \log(L_{n})$, where $R_{gn}$ is the number of reads for sample $n$, gene $g$ and $L_{n}$ is the effective library size for the $n^{th}$ sample.
 
-For computational reasons, we assume a normal model for the data after transforming it. First, we compute normalization factor $c_i$ for each column; second, we take logarithms of the data, after adding 1, and apply the normalization on the log scale, .i.e.
-$$\mbox{transformed log-count in column }i = \log (\mbox{original count in column }i+1) + \log(c_i)$$. \iftoggle{thesis}{The result after applying these steps to the data in Table \ref{tab:data} are shown in Table \ref{tab:data-transformed}}.
+% For computational reasons, we assume a normal model for the data after transforming it. First, we compute normalization factor $c_i$ for each column; second, we take logarithms of the data, after adding 1, and apply the normalization on the log scale, .i.e.
+% $$\mbox{transformed log-count in column }i = \log (\mbox{original count in column }i+1) + \log(c_i)$$. 
+\iftoggle{thesis}{
+The result after applying these steps to the data in Table \ref{tab:data} are shown in Table \ref{tab:data-transformed}.
+% latex table generated in R 3.4.2 by xtable 1.8-2 package
+% Tue Oct 17 15:25:11 2017
+\begin{table}[ht]
+\centering
+\caption{\small Same sample of RNA-seq total read counts as in Table \ref{tab:data}, after normalization and transformation. Weighted trimmed mean of M-values normalization was performed to estimate effective library size using the \texttt{calcNormFactors} function in \texttt{edgeR} \cite{edger2010}.}
+\label{tab:data-transformed}
+\vspace{.2in}
+\centering
+\begin{tabular}{lrrrrrrrr}
+  \hline
+& $\mbox{B73}_1$ & $\mbox{B73}_2$ & $\mbox{B73}_3$ & $\mbox{B73}_4$ & $\mbox{Mo17}_1$ & $\mbox{Mo17}_2$ & $\mbox{Mo17}_3$ & $\mbox{Mo17}_4$ \\ 
+  \hline
+$\mbox{gene}_1$ &-9.66 & -9.70 & -9.55 & -9.54 & -14.71 & -14.62 & -15.51 & -15.48 \\ 
+$\mbox{gene}_2$ &-10.13 & -10.03 & -10.09 & -10.06 & -10.13 & -10.16 & -10.20 & -10.31 \\ 
+$\mbox{gene}_3$ &-8.83 & -8.74 & -9.23 & -9.37 & -8.67 & -8.65 & -8.95 & -8.94 \\ 
+$\mbox{gene}_4$ &-13.60 & -13.59 & -14.25 & -14.99 & -13.90 & -12.97 & -13.90 & -14.23 \\ 
+$\mbox{gene}_5$ &-15.47 & -15.38 & -16.04 & -14.99 & -9.24 & -9.16 & -9.15 & -9.41 \\ 
+   \hline
+\end{tabular}
+\end{table}
+}{}
 
 \subsection{Model}
-We let $Y_{gci} = \log \frac{Z_{gci}+1}{C_{ci}}$, where $Z_{gi}$ is the total read count for replicate $i$ of genotype $c$. $C_{ci}$ is a normalizing constant which is used to adjust for differences in the total RNA content in each sample. We estimate the normalizing constants using the trimmed mean of M-values procedure \cite{robinson2010}. Our design matrix for each gene is
+Let $y_{gn}$ be the normalized log-count for gene $g$ in sample $n$. 
+We assume the normal model of (\ref{eq:data}) where the design matrix for each gene is
 
 \begin{equation*}
 \begin{blockarray}{rrrr}
-  Sample & \mbox{(intercept) }\beta_1 & \mbox{(Mo17) }\beta_2 & \mbox{(flow cell) }\beta_3\\
+  Sample & \mbox{intercept} & \mbox{Mo17} & \mbox{flow cell}\\
   \begin{block}{r(rrr)}
-  \mbox{B73,1} & 1 & 0 & 0\\
-  \mbox{B73,2} & 1 & 0 & 0\\
-  \mbox{B73,3} & 1 & 0 & 1\\
-  \mbox{B73,4} & 1 & 0 & 1\\
-  \mbox{Mo17,1} & 1 & 1 & 0\\
-  \mbox{Mo17,2} & 1 & 1 & 0\\
-  \mbox{Mo17,3} & 1 & 1 & 1\\
-  \mbox{Mo17,4} & 1 & 1 & 1\\
+  \mbox{B73}_1 & 1 & 0 & 0\\
+  \mbox{B73}_2 & 1 & 0 & 0\\
+  \mbox{B73}_3 & 1 & 0 & 1\\
+  \mbox{B73}_4 & 1 & 0 & 1\\
+  \mbox{Mo17}_1 & 1 & 1 & 0\\
+  \mbox{Mo17}_2 & 1 & 1 & 0\\
+  \mbox{Mo17}_3 & 1 & 1 & 1\\
+  \mbox{Mo17}_4 & 1 & 1 & 1\\
   \end{block}
 \end{blockarray}.
 \label{design}
 \end{equation*}
 
-We fit the model using four independent chains. They were initialized by setting unique random seeds and running 1000 iterations, then reordering the cluster indices by $\pi$. 50,000 iterations were run for each chain after 10,000 iterations of burn-in. 
+We fit the BNP model using four independent chains. Random initialization points were generated by setting unique random seeds and following the steps outlined in Section \ref{subsec:initialization}, using 1000 iterations for the initial exploration, and then reordering the cluster indices by $\pi$. 50,000 iterations were run for each chain after 10,000 iterations of burn-in. 
 \iftoggle{thesis}{
 Potential scale reduction factors are shown in figure \ref{rhat}. Values close to 1 are consistent with convergence; 1.1 has been suggested as a threshold \citep{gelman-book-rhat}. While some parameters exceeded 1.1, the vast majority were close to 1.
 \begin{figure}
@@ -683,12 +686,14 @@ In addition to Equation \ref{eq:data}, assume $\sigma^2_g = \sigma^2$ for all $g
 
 In contrast to the BNP model, the gene independent model puts no assumptions on the distribution of gene-specific parameters and borrows no information across genes. The hierarchical linear model assumes that the $\beta_g$ parameters are realizations of a multivariate normal distribution. This allows for borrowing of information, since $\mu$ and $\Sigma$ are estimated using all of the data and inference for $\beta_g$ is moderated by them.
 
-Since the hierarchical linear model restricts $\mathcal{P}$ to the family of multivariate normal distributions, the effect of borrowing information via $\mathcal{P}$ is to pull all estimates for $\beta_g$ toward a common value. In Figure \ref{pairs-3-methods}, by comparing the bivariate histograms of the point estimates obtained by the hierarchical model (middle column) to the gene independent model (left column), there is detectable shrinkage. This shrinkage preserves the shape of the distribution of estimates obtained by the gene independent model while reducing the magnitude of the estimates by shrinking them toward a common value. By comparison, of the point estimates obtained by the BNP model (posterior means), some are shrunk while some are not and the degree of shrinkage in many cases is more dramatic. For example, in the three-way comparison of the bottom panels, the BNP shows aggressive shrinkage, relative to the hierarchical model, of the estimates of Mo17 toward zero for those genes with the most negative flow cell effects. Figure \ref{local-shrink} shows this phenomena in greater detail. The left-panels show a zoomed in version of the lower-left plot in Figure \ref{pairs-3-methods}, with a bounding box identifying a region of interest. The next plot to the right shows the gene independent estimates from that region, while the last two plots in the row show the corresponding estimates for the hierarchical and BNP models. The BNP estimates are much less predictable, but they show clear local shrinkage toward regions with high density in the left-most plot. %The seemingly erratic behavior is related to the two additional dimensions in which the shrinkage is being applied.
+Since the hierarchical linear model restricts $\mathcal{P}$ to the family of multivariate normal distributions, the effect of borrowing information via $\mathcal{P}$ is to pull all estimates for $\beta_g$ toward a common value. Figure \ref{P-compare} shows the empirical density of the independent estimates alongside estimates of the underlying distribution for the BNP and normal hierarchical models. These estimates are obtained by binning $10^6$ draws of the gene specific parameters -- from the posterior distribution of $P$ for BNP and from the estimate of $\mathcal{P}$ for the hierarchical model. To draw $\beta_{\mbox{new}}$ from $\mathcal{P}|y$, we simply draw $\mathcal{P}^{(s)}$ uniformly from $\{s\in 1, \ldots, S\}$ and draw $\beta_{\mbox{new}}$ from $\mathcal{P}^{(s)}$. Intuitively, by incorporating local detail in the distribution of the component-specific parameters, the BNP model can direct shrinkage more effectively than the normal hierarchical model.
+
+In Figure \ref{pairs-3-methods}, we compare the bivariate histograms of the point estimates obtained by the hierarchical model (middle column) to the gene independent model (left column), and note that there is detectable shrinkage. This shrinkage preserves the shape of the distribution of estimates obtained by the gene independent model while reducing the magnitude of the estimates by shrinking them toward a common value. By comparison, of the point estimates obtained by the BNP model (posterior means), some are shrunk while some are not and the degree of shrinkage in many cases is more dramatic. For example, in the three-way comparison of the bottom panels, the BNP shows aggressive shrinkage, relative to the hierarchical model, of the estimates of Mo17 toward zero for those genes with the most negative flow cell effects. Figure \ref{local-shrink} shows this phenomena in greater detail. The left-panels show a zoomed in version of the lower-left plot in Figure \ref{pairs-3-methods}, with a bounding box identifying a region of interest. The next plot to the right shows the gene independent estimates from that region, while the last two plots in the row show the corresponding estimates for the hierarchical and BNP models. The BNP estimates are much less predictable, but they show clear local shrinkage toward regions with high density in the left-most plot. %The seemingly erratic behavior is related to the two additional dimensions in which the shrinkage is being applied.
 
 \begin{figure}[ht]
 \centering
 \includegraphics[width=.9\textwidth]{pairs-3-methods-std}
-\caption{Histogram of point estimates across genes, showing pairwise comparisons, using hexagonal binning. Relative to the independent estimates obtained by least-squares ("OLS"), the linear mixed-effects model ("LMM") shrinks all estimates toward a common mean, while the Bayesian nonparametric model shrinks estimates toward an underlying distribution learned from the data.}
+\caption{Histogram of point estimates across genes, showing pairwise comparisons, using hexagonal binning. Relative to the independent estimates obtained by least-squares, the estimates of the normal hierarchical model shrinks all estimates toward a common mean, while the Bayesian nonparametric model shrinks estimates toward an underlying distribution learned from the data.}
 \label{pairs-3-methods}
 \end{figure}
 
@@ -699,7 +704,12 @@ Since the hierarchical linear model restricts $\mathcal{P}$ to the family of mul
 \label{method-compare}
 \end{figure}
 
-
+\begin{figure}
+\centering
+\includegraphics[width=.9\textwidth]{beta2v3-P-est}
+\caption{\small Comparing estimates of the underlying distribution of gene specific parameters.}
+\label{P-compare}
+\end{figure}
 % \begin{figure}
 % \centering
 % \includegraphics[width=.9\textwidth]{method-compare-std}
