@@ -1,0 +1,173 @@
+\begin{thebibliography}{}
+
+\bibitem[Antoniak, 1974]{antoniak}
+Antoniak, C.~E. (1974).
+\newblock Mixtures of {D}irichlet processes with applications to {B}ayesian
+  nonparametric problems.
+\newblock {\em The Annals of Statistics}, pages 1152--1174.
+
+\bibitem[Bates et~al., 2014]{lme4}
+Bates, D., Maechler, M., Bolker, B., Walker, S., et~al. (2014).
+\newblock lme4: Linear mixed-effects models using {E}igen and {S}4.
+\newblock {\em R package version}, 1(7):1--23.
+
+\bibitem[Bell and Hoberock, 2011]{thrust}
+Bell, N. and Hoberock, J. (2011).
+\newblock Thrust: A productivity-oriented library for {CUDA}.
+\newblock {\em GPU computing gems Jade edition}, 2:359--371.
+
+\bibitem[Blelloch, 1990]{blelloch1990}
+Blelloch, G.~E. (1990).
+\newblock Prefix sums and their applications.
+
+\bibitem[Escobar, 1994]{escobar1994}
+Escobar, M.~D. (1994).
+\newblock Estimating normal means with a dirichlet process prior.
+\newblock {\em Journal of the American Statistical Association},
+  89(425):268--277.
+
+\bibitem[Ferguson, 1973]{ferguson}
+Ferguson, T.~S. (1973).
+\newblock A {B}ayesian analysis of some nonparametric problems.
+\newblock {\em The Annals of Statistics}, pages 209--230.
+
+\bibitem[Gelman et~al., 2014a]{gelman-book}
+Gelman, A., Carlin, J.~B., Stern, H.~S., Dunson, D.~B., Vehtari, A., and Rubin,
+  D.~B. (2014a).
+\newblock {\em Bayesian data analysis}, volume~2.
+\newblock CRC press Boca Raton, FL.
+
+\bibitem[Gelman et~al., 2014b]{gelman-book-rhat}
+Gelman, A., Carlin, J.~B., Stern, H.~S., Dunson, D.~B., Vehtari, A., and Rubin,
+  D.~B. (2014b).
+\newblock {\em Bayesian data analysis}, volume~2.
+\newblock CRC press Boca Raton, FL.
+
+\bibitem[Ha and Han, 2013]{ha2013}
+Ha, S.-W. and Han, T.-D. (2013).
+\newblock A scalable work-efficient and depth-optimal parallel scan for the
+  gpgpu environment.
+\newblock {\em IEEE Transactions on Parallel and Distributed Systems},
+  24(12):2324--2333.
+
+\bibitem[Harris et~al., 2007]{harris-scan}
+Harris, M., Sengupta, S., and Owens, J.~D. (2007).
+\newblock Parallel prefix sum (scan) with {CUDA}.
+\newblock {\em GPU gems}, 3(39):851--876.
+
+\bibitem[Hoberock and Bell, 2008]{thrustslides}
+Hoberock, J. and Bell, N. (2008).
+\newblock Thrust.
+\newblock (PowerPoint slides).
+
+\bibitem[Ihaka and Gentleman, 1996]{r}
+Ihaka, R. and Gentleman, R. (1996).
+\newblock R: a language for data analysis and graphics.
+\newblock {\em Journal of Computational and Graphical Statistics},
+  5(3):299--314.
+
+\bibitem[Ishwaran and James, 2001]{ishwaran2001}
+Ishwaran, H. and James, L.~F. (2001).
+\newblock Gibbs sampling methods for stick-breaking priors.
+\newblock {\em Journal of the American Statistical Association},
+  96(453):161--173.
+
+\bibitem[Ishwaran and Zarepour, 2000]{ishwaran2000}
+Ishwaran, H. and Zarepour, M. (2000).
+\newblock Markov chain {M}onte {C}arlo in approximate {D}irichlet and beta
+  two-parameter process hierarchical models.
+\newblock {\em Biometrika}, 87(2):371--390.
+
+\bibitem[Landau and Niemi, 2016]{landau}
+Landau, W. and Niemi, J. (2016).
+\newblock A fully bayesian strategy for high-dimensional hierarchical modeling
+  using massively parallel computing.
+\newblock {\em arXiv preprint arXiv:1606.06659}.
+
+\bibitem[Law et~al., 2014]{voom}
+Law, C.~W., Chen, Y., Shi, W., and Smyth, G.~K. (2014).
+\newblock Voom: precision weights unlock linear model analysis tools for
+  {RNA}-seq read counts.
+\newblock {\em Genome Biology}, 15(2):R29.
+
+\bibitem[Liu et~al., 2015]{liu}
+Liu, F., Wang, C., and Liu, P. (2015).
+\newblock A {S}emi-parametric {B}ayesian {A}pproach for {D}ifferential
+  {E}xpression analysis of {RNA}-seq {D}ata.
+\newblock {\em Journal of Agricultural, Biological, and Environmental
+  Statistics}, 20(4):555--576.
+
+\bibitem[Love et~al., 2014]{deseq2014}
+Love, M.~I., Huber, W., and Anders, S. (2014).
+\newblock Moderated estimation of fold change and dispersion for rna-seq data
+  with deseq2.
+\newblock {\em Genome biology}, 15(12):550.
+
+\bibitem[Neal, 2000]{neal2000}
+Neal, R.~M. (2000).
+\newblock Markov chain sampling methods for dirichlet process mixture models.
+\newblock {\em Journal of Computational and Graphical Statistics},
+  9(2):249--265.
+
+\bibitem[Nvidia, 2008]{cublas}
+Nvidia, C. (2008).
+\newblock C{UBLAS} library.
+\newblock {\em NVIDIA Corporation, Santa Clara, California}, 15(27):31.
+
+\bibitem[Nvidia, 2010]{curand}
+Nvidia, C. (2010).
+\newblock C{URAND} library.
+
+\bibitem[Oshlack et~al., 2010]{oshlack2010rna}
+Oshlack, A., Robinson, M.~D., and Young, M.~D. (2010).
+\newblock From {RNA}-seq reads to differential expression results.
+\newblock {\em Genome Biology}, 11(12):220.
+
+\bibitem[Paschold et~al., 2012]{paschold}
+Paschold, A., Jia, Y., Marcon, C., Lund, S., Larson, N.~B., Yeh, C.-T.,
+  Ossowski, S., Lanz, C., Nettleton, D., Schnable, P.~S., et~al. (2012).
+\newblock Complementation contributes to transcriptome complexity in maize
+  ({Z}ea mays l.) hybrids relative to their inbred parents.
+\newblock {\em Genome Research}, 22(12):2445--2454.
+
+\bibitem[Plummer et~al., 2010]{plummer}
+Plummer, M., Best, N., Cowles, K., and Vines, K. (2010).
+\newblock coda: Output analysis and diagnostics for {MCMC}. {R} package version
+  0.14-2.
+
+\bibitem[Robinson et~al., 2010]{edger2010}
+Robinson, M.~D., McCarthy, D.~J., and Smyth, G.~K. (2010).
+\newblock edger: a bioconductor package for differential expression analysis of
+  digital gene expression data.
+\newblock {\em Bioinformatics}, 26(1):139--140.
+
+\bibitem[Robinson and Oshlack, 2010]{robinson2010}
+Robinson, M.~D. and Oshlack, A. (2010).
+\newblock A scaling normalization method for differential expression analysis
+  of {RNA}-seq data.
+\newblock {\em Genome Biology}, 11(3):R25.
+
+\bibitem[Sengupta et~al., 2008]{sengupta2008}
+Sengupta, S., Harris, M., and Garland, M. (2008).
+\newblock Efficient parallel scan algorithms for {GPU}s.
+\newblock {\em NVIDIA, Santa Clara, CA, Tech. Rep. NVR-2008-003}, (1):1--17.
+
+\bibitem[Sethuraman, 1994]{sethuraman}
+Sethuraman, J. (1994).
+\newblock A constructive definition of {D}irichlet priors.
+\newblock {\em Statistica Sinica}, pages 639--650.
+
+\bibitem[Suchard et~al., 2010]{suchard}
+Suchard, M.~A., Wang, Q., Chan, C., Frelinger, J., Cron, A., and West, M.
+  (2010).
+\newblock Understanding gpu programming for statistical computation: Studies in
+  massively parallel massive mixtures.
+\newblock {\em Journal of computational and graphical statistics},
+  19(2):419--438.
+
+\bibitem[Walker, 2010]{walker2010bayesian}
+Walker, S.~G. (2010).
+\newblock {\em Bayesian nonparametric methods: motivation and ideas}.
+\newblock Cambridge: Cambridge University Press.
+
+\end{thebibliography}

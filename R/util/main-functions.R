@@ -11,7 +11,7 @@ initialize_chain <- function(seed, K, n.iter, methodPi, idx=0:9){
   
   contr <- formatControl(n_iter = 2,
                          thin = 1,
-                         warmup = 1000,
+                         warmup = 10000,
                          methodPi = "symmDirichlet",
                          idx_save = 1,
                          n_save_P = 1,

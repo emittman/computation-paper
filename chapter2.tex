@@ -22,59 +22,79 @@ Much effort has gone into researching methods in the case of gene expression. Se
 \label{pairs-ind-est}
 \end{figure}
 
-A special case of gene expression profiling concerning two populations is differential gene expression. Because expression is typically modeled on the log scale, the differential expression at a particular gene, termed `log-fold-change', is the parameter of interest. \citet{liu} proposed a semiparametric model treating the log-fold change parameters as random effects following an unknown distribution, $\mathcal{P}$, where $\mathcal{P}$ is a random distribution arising from a Dirichlet process. In this paper, we modify and extend the approach taken by \cite{liu} to allow nonparametric inference for a large class of gene profiling experiments. In our method, we use a DP to model jointly the distribution of the $p$-dimensional gene-specific regression coefficient,$\beta_g$, and variance, $\sigma^2_g$.
+A special case of gene expression profiling concerning two populations is differential gene expression. Because expression is typically modeled on the log scale, the differential expression at a particular gene, termed `log-fold-change', is the parameter of interest. \citet{liu} proposed a semiparametric model treating the log-fold change parameters as random effects following an unknown distribution, $\mathcal{P}$, where $\mathcal{P}$ is a random distribution arising from a Dirichlet process (DP). In this paper, we modify and extend the approach taken by \cite{liu} to allow nonparametric inference for a large class of gene profiling experiments. In our method, we use a DP to model jointly the distribution of the $p$-dimensional gene-specific regression coefficient, $\beta_g$, and variance, $\sigma^2_g$.
 
 %The parameters of the DP either chosen, specifying a prior distribution on $\mathcal{P}$, or by placing a prior on these parameters. 
 Common practice for Bayesian nonparametric applications is to sample from the joint posterior distribution using a Gibbs sampler. A number of Gibbs sampling algorithms for DP mixture models have been proposed. These can be categorized into two types: `marginal,' where full conditionals are with respect to the joint posterior with the unknown $\mathcal{P}$ integrated out, and `conditional', where $\mathcal{P}$ is also sampled and conditioned on.
 
-When $\mathcal{P}$ is not of particular interest, marginal approaches are often preferable. However, for large $G$, these algorithms are not computationally tractable as they require one-at-a-time updating of the cluster assignment for each $g$ conditioning on all $g'\neq g$. On the other hand, conditional Gibbs methods, which depend on the ``stick-breaking" representation of the DP \citet{sethuraman}, are amenable to parallelism because cluster assignment is conditionally independent given $\mathcal{P}$. \citet{suchard} argued for wider use of graphics processing units (GPUs) by statisticians for computationally demanding, parallelizable tasks to acheive large speed-ups in real time. We provide a brief introduction to computing in the massively parallel context, including some general guidelines that can help in designing implementations that are well-suited for the GPU. We demonstrate that Dirichlet process mixture models for gene expression is feasible in practice by utilizing currently available GPU technology and describe how the implementation was contructed in light of the guidelines.
+When $\mathcal{P}$ is not of particular interest, marginal approaches are often preferable. However, for large $G$, these algorithms are not computationally tractable as they require one-at-a-time updating of the cluster assignment for each $g$ conditioning on all $g'\neq g$. On the other hand, conditional Gibbs methods, which depend on the ``stick-breaking" representation of the DP \citet{sethuraman}, are amenable to parallelism because cluster assignment is conditionally independent given $\mathcal{P}$. \citet{suchard} argued for wider use of graphics processing units (GPUs) by statisticians for computationally demanding, parallelizable tasks to acheive large speed-ups in real time. We provide a brief introduction to computing in the massively parallel context, including some general guidelines that can help in designing implementations that are well-suited for the GPU. We demonstrate that using a Dirichlet process mixture as a `shrinkage prior' is feasible in practice by utilizing currently available GPU technology and describe our implementation.
 
 Section \ref{sec:data} introduces the structure of gene expression profiling data suitable for our method and recommended preprocessing steps. Section \ref{sec:model} presents our model for gene expression, which features a hierarchical model for the gene-specific parameters without parametric assumptions. Next, Section \ref{sec:inference} outlines a procedure for posterior sampling based on the blocked Gibbs sampler of \cite{ishwaran2000}. Section \ref{sec:parallel} introduces concepts related to programming for GPU parallelism and discusses details of two important parallel algorithms. The Gibbs sampler is revisited and GPU implementation details are provided. To investigate the properties of our algorithm, in Section \ref{sec:timing} we discuss a study we conducted to assess the time requirement under variable conditions. Section \ref{sec:analysis} presents an analysis of differential expression data and contrasts our results with both a gene-independent analysis and a mixed-effects analysis assuming a multivariate normal distribution on the random effects. Finally, in Section \ref{sec:discussion} we put our proposed method in context, discuss potential applications and consider future directions for research.
 % In summary, to avoid sensitivity to the prior distribution on $\mathcal{P}$, we propose to model it as a truncated Dirichlet process. Advances in computers have seen a rapid increase in the use of Markov Chain Monte Carlo (MCMC) methods for fitting sophisticated statistical models. Because such methods rely on thousands or even millions of simluated draws generated one after another, fast computing is critical to making them computationally feasible. Nonparametric Bayesian methods are no different in this regard, but when the size of the data set gets moderately large, the computational effort required per draw can be enormous as the number of parameters grows with the sample size. Graphics processing units (GPUs) have potential in this area, provided that most of the work can be divided into many parallel tasks which operate on different pieces of memory. By exploiting conditional independence in the model and making use of parallelized algorithms, we demonstrate the feasibility of nonparametric Bayesian modeling in the ``big data" setting of gene expression data.
 \section{Data}
 \label{sec:data}
-We consider data that can be represented in a tabular format, with rows corresponding to measurement components and columns to experimental/observational units (for an abbreviated example, see table \ref{tab:data}). Important examples include RNA-seq read counts and microarray data. Relevant metadata for the samples include information about groupings, either due to experimental treatment, technical design or natural biological groupings by population. Metadata for the genes themselves, while important to the biologist, are not used by our method.
+Our method is intended for cases where sample size is limited and each sample provides a high-dimensional response measurement. Such data can be represented in a tabular format, with each row associated with a component of the response and each column with an experimental/observational unit. An example is shown in Table \ref{tab:data}. We assume that a design matrix encoding the important relationships between samples is known and can be applied equally to all response components.
+
+Important cases include RNA-seq read counts and microarray data. For these cases, the design matrix for the samples could include information about treatments, experimental design, known genotypic and phenotypic relationships. Metadata for the genes themselves are not utilized.
 
 %TODO: Choose interesting genes
 
 % latex table generated in R 3.4.1 by xtable 1.8-2 package
 % Thu Aug 31 13:00:59 2017
+% \begin{table}[ht]
+% \centering
+% \label{tab:data}
+% \begin{tabular}{lrrrrrrrr}
+%   \hline
+%  & $\mbox{B73}_1$ & $\mbox{B73}_2$ & $\mbox{B73}_3$ & $\mbox{B73}_4$ & $\mbox{Mo17}_1$ & $\mbox{Mo17}_2$ & $\mbox{Mo17}_3$ & $\mbox{Mo17}_4$ \\ 
+%   \hline
+% $\mbox{gene}_1$ &   1 &   0 &   0 &   2 &   0 &   1 &   0 &   0 \\ 
+% $\mbox{gene}_2$ &   3 &   4 &   6 &   0 &   8 &  17 &  18 &  20 \\ 
+% $\mbox{gene}_3$ & 2323 & 1533 & 1932 & 1945 & 2070 & 1582 & 2196 & 1882 \\ 
+% $\mbox{gene}_4$ &   2 &   1 &   0 &   2 &   4 &   4 &   5 &   3 \\ 
+% $\vdots$ &    &    &    &  $\vdots$   &   &   &   &  $\vdots$ \\ 
+%    \hline
+% \end{tabular}
+% \end{table}
+% latex table generated in R 3.4.2 by xtable 1.8-2 package
+% Tue Oct 17 15:02:36 2017
 \begin{table}[ht]
 \centering
-\caption{\small Sample of RNA-seq total read counts from \citep{paschold}. Columns names identify samples, including the genotype and a replicate number, from which we can infer the flow cell that was used for sequencing. Gene annotation information, while available, is not considered as our method does not make use of it.}
-\vspace{.2in}
+\caption{\small Sample of RNA-seq total read counts from \citep{paschold}. Columns names identify samples, including the genotype and a replicate number, from which we can infer the flow cell that was used for sequencing. Gene annotation information (regarding the rows), is not used for in our analysis. The first and last genes listed strongly indicate differential expression between the two inbred maize lines.}
 \label{tab:data}
+\vspace{.25cm}
 \begin{tabular}{lrrrrrrrr}
   \hline
- & $\mbox{B73}_1$ & $\mbox{B73}_2$ & $\mbox{B73}_3$ & $\mbox{B73}_4$ & $\mbox{Mo17}_1$ & $\mbox{Mo17}_2$ & $\mbox{Mo17}_3$ & $\mbox{Mo17}_4$ \\ 
+& $\mbox{B73}_1$ & $\mbox{B73}_2$ & $\mbox{B73}_3$ & $\mbox{B73}_4$ & $\mbox{Mo17}_1$ & $\mbox{Mo17}_2$ & $\mbox{Mo17}_3$ & $\mbox{Mo17}_4$ \\ 
   \hline
-$\mbox{gene}_1$ &   1 &   0 &   0 &   2 &   0 &   1 &   0 &   0 \\ 
-$\mbox{gene}_2$ &   3 &   4 &   6 &   0 &   8 &  17 &  18 &  20 \\ 
-$\mbox{gene}_3$ & 2323 & 1533 & 1932 & 1945 & 2070 & 1582 & 2196 & 1882 \\ 
-$\mbox{gene}_4$ &   2 &   1 &   0 &   2 &   4 &   4 &   5 &   3 \\ 
-$\vdots$ &    &    &    &  $\vdots$   &   &   &   &  $\vdots$ \\ 
+$\mbox{gene}_1$ & 666 & 590 & 654 & 703 &   3 &   3 &   1 &   1 \\ 
+$\mbox{gene}_2$& 414 & 422 & 383 & 416 & 392 & 346 & 402 & 351 \\ 
+  $\mbox{gene}_3$ & 1525 & 1530 & 904 & 833 & 1688 & 1568 & 1413 & 1377 \\ 
+  $\mbox{gene}_4$ &  12 &  11 &   5 &   2 &   8 &  20 &   9 &   6 \\ 
+  $\mbox{gene}_5$ &   1 &   1 &   0 &   2 & 951 & 945 & 1157 & 867 \\ 
    \hline
 \end{tabular}
 \end{table}
-
 \iftoggle{thesis}{%
-Because the read count totals are left-skewed, we use a logarithmic transformation of the RNA-seq counts, performing the analysis instead with log-counts per million (log-cpm). The details are given in Section \ref{sec:analysis}. Table \ref{tab:data-transformed} shows the result of this transformation applied to the data in Table \ref{tab:data}.
-% latex table generated in R 3.4.1 by xtable 1.8-2 package
-% Thu Aug 31 14:28:27 2017
+Because the read count totals are right-skewed, we use a logarithmic transformation of the RNA-seq counts, performing the analysis instead with log counts normalized by the effective library size. The details are given in Section \ref{sec:analysis}. Table \ref{tab:data-transformed} shows the result of this transformation applied to the data in Table \ref{tab:data}.
+
+% latex table generated in R 3.4.2 by xtable 1.8-2 package
+% Tue Oct 17 15:25:11 2017
 \begin{table}[ht]
 \centering
-\caption{\small Same sample of RNA-seq total read counts as in Table \ref{tab:data}, after transformation and normalization. Weighted trimmed mean of M-values normalization was performed using the \texttt{calcNormFactors} function in \texttt{edgeR} \cite{edger2010}.}
+\caption{\small Same sample of RNA-seq total read counts as in Table \ref{tab:data}, after normalization and transformation. Weighted trimmed mean of M-values normalization was performed to estimate effective library size using the \texttt{calcNormFactors} function in \texttt{edgeR} \cite{edger2010}.}
 \label{tab:data-transformed}
 \vspace{.2in}
-\begin{tabular}{ccccccccc}
+\centering
+\begin{tabular}{lrrrrrrrr}
   \hline
- & $\mbox{B73}_1$ & $\mbox{B73}_2$ & $\mbox{B73}_3$ & $\mbox{B73}_4$ & $\mbox{Mo17}_1$ & $\mbox{Mo17}_2$ & $\mbox{Mo17}_3$ & $\mbox{Mo17}_4$ \\ 
+& $\mbox{B73}_1$ & $\mbox{B73}_2$ & $\mbox{B73}_3$ & $\mbox{B73}_4$ & $\mbox{Mo17}_1$ & $\mbox{Mo17}_2$ & $\mbox{Mo17}_3$ & $\mbox{Mo17}_4$ \\ 
   \hline
-$\mbox{gene}_1$ & 0.59 & -0.05 & 0.02 & 1.11 & -0.02 & 0.69 & 0.05 & 0.09 \\ 
-$\mbox{gene}_2$ & 1.28 & 1.56 & 1.97 & 0.01 & 2.18 & 2.89 & 3.00 & 3.13 \\ 
-$\mbox{gene}_3$ & 7.65 & 7.29 & 7.59 & 7.58 & 7.61 & 7.36 & 7.75 & 7.63 \\ 
-$\mbox{gene}_4$ & 0.99 & 0.64 & 0.02 & 1.11 & 1.59 & 1.61 & 1.85 & 1.48 \\ 
-$\vdots$ &  &  &  & $\vdots$ &  & &  & $\vdots$ \\ 
+$\mbox{gene}_1$ &-9.66 & -9.70 & -9.55 & -9.54 & -14.71 & -14.62 & -15.51 & -15.48 \\ 
+$\mbox{gene}_2$ &-10.13 & -10.03 & -10.09 & -10.06 & -10.13 & -10.16 & -10.20 & -10.31 \\ 
+$\mbox{gene}_3$ &-8.83 & -8.74 & -9.23 & -9.37 & -8.67 & -8.65 & -8.95 & -8.94 \\ 
+$\mbox{gene}_4$ &-13.60 & -13.59 & -14.25 & -14.99 & -13.90 & -12.97 & -13.90 & -14.23 \\ 
+$\mbox{gene}_5$ &-15.47 & -15.38 & -16.04 & -14.99 & -9.24 & -9.16 & -9.15 & -9.41 \\ 
    \hline
 \end{tabular}
 \end{table}
@@ -82,7 +102,9 @@ $\vdots$ &  &  &  & $\vdots$ &  & &  & $\vdots$ \\
 
 \section{Bayesian nonparametric hierarchical regression model}
 \label{sec:model}
-Let $y_{gn}$ represent the observed expression (possibly after transformation) for gene $g$, sample $n$. Let $x_{n}^\top$ be the row of the design matrix $X$ corresponding to sample $n$. We will use the upper case letters $G$ and $N$, to denote the number of genes and samples, respectively. In addition, we accommodate possible observation-level weights, $w_{gn}$. For the observed data, we assume the data model
+Let $y_{gn}$ represent the observed expression (possibly after transformation) for component $g$, sample $n$. Let $x_{n}^\top$ be the row of the design matrix $X$ corresponding to sample $n$. We will use the upper case letters $G$ and $N$, to denote the number of components and samples, respectively.
+% In addition, we accommodate possible observation-level weights, $w_{gn}$. 
+For the observed data, we assume the data model
 \begin{equation}
 \label{eq:data}
 y_{gn} \ind \op{N} \left( x_{n}^\top \beta_g, \sigma^2_g \right),
@@ -97,11 +119,11 @@ where we specify a Dirichlet process on $\mathcal{P}$, i.e.,
 \mathcal{P} \sim \op{DP}(\alpha \mbox{Q}).
 \end{equation*}
 \iftoggle{thesis}{
-The use of this prior, due to \citet{ferguson}, is a distribution over probability distributions, such that for any finite disjoint partition $\{A_i\}_{i>=1}^n$ on $\mathbb{R}^p$, $\mathcal{P}$ is a random measure such that the joint distribution $\left(\mathcal{P}(A_1),\ldots,\mathcal{P}(A_n)\right) \sim \op{Dir}\left(\alpha Q(A_1),\ldots,\alpha Q(A_n)\right).$ The Dirichlet process has two parameters: $Q$, the base measure, represents a prior guess at the distribution. $\alpha$, the concentration parameter expresses the degree to which $\mathcal{P}$ will agree with $Q$ on any set $A$. This follows from the definition given above and known properties of the Dirichlet distribution, i.e., $\op{E}\left(\mathcal{P}(A)\right)=Q(A)$, and $\op{V}\left(\mathcal{P}(A)\right)=\frac{Q(A)(1 - Q(A)}{\alpha + 1}$, showing that $\mathcal{P}(A) \stackrel{p}{\rightarrow} Q(A)$ as $\alpha \rightarrow \infty$ for any set $A$.
+The use of this prior, due to \citet{ferguson}, is a distribution over probability distributions, such that for any finite disjoint partition $\{A_i\}_{i>=1}^n$ on $\mathbb{R}^p$, $\mathcal{P}$ is a random measure such that the joint distribution $\left(\mathcal{P}(A_1),\ldots,\mathcal{P}(A_n)\right) \sim \op{Dir}\left(\alpha Q(A_1),\ldots,\alpha Q(A_n)\right).$ The DP has two parameters: $Q$, the base measure, represents a prior guess at the distribution. $\alpha$, the concentration parameter expresses the degree to which $\mathcal{P}$ will agree with $Q$ on any set $A$. This follows from the definition given above and known properties of the Dirichlet distribution, i.e., $\op{E}\left(\mathcal{P}(A)\right)=Q(A)$, and $\op{V}\left(\mathcal{P}(A)\right)=\frac{Q(A)(1 - Q(A)}{\alpha + 1}$, showing that $\mathcal{P}(A) \stackrel{p}{\rightarrow} Q(A)$ as $\alpha \rightarrow \infty$ for any set $A$.
 }{}
-By modeling $\mathcal{P}$ with a Dirichlet process one can be noninformative about the overall shape of $\mathcal{P}$, allowing for irregular shapes, multimodality, and so forth. An argument can be made that by incorporating our uncertainty about these features of the distribution is required for coherent interpretation of the posterior distribution \citep{walker2010bayesian}. For more information about the properties of the DP, see \cite{ferguson}.
+By modeling $\mathcal{P}$ with a DP, one can be noninformative about the overall shape of $\mathcal{P}$, allowing for irregular shapes, multimodality and so forth. An argument can be made that by incorporating our uncertainty about these features of the distribution is required for coherent interpretation of the posterior distribution \citep{walker2010bayesian}. For more information about the properties of the DP, see \cite{ferguson}.
 
-As shown by \citet{sethuraman}, it follows from the definition of the Dirichlet process that $\mathcal{P}$ is almost surely discrete and realizations of $\mathcal{P}$ can be produced by the following stick-breaking construction:
+As shown by \citet{sethuraman}, it follows from the definition of the DP that $\mathcal{P}$ is almost surely discrete and realizations of $\mathcal{P}$ can be produced by the following stick-breaking construction:
 
 Let 
 \begin{equation}
@@ -153,7 +175,7 @@ The parameter $\alpha$ plays an important role in the model, since it helps to d
 
 \begin{figure}
 \includegraphics[width=.5\textwidth]{alphaprior}
-\caption{\small The number of clusters determined by the model is influenced by the parameter $\alpha$, whose value determines the expected number of clusters prior to seeing the data. The figures above demonstrate the prior distribution of the prior expected number of clusters, $\op{E}(K_{occ})$ for datasets with various number of genes, $G$.}
+\caption{\small The number of clusters determined by the model is influenced by the parameter $\alpha$, whose value determines the expected number of clusters prior to seeing the data. The figures above demonstrate the prior distribution of the prior expected number of clusters, $\op{E}(K_{occ})$ for datasets with various number of response components, $G$.}
 \label{alphaprior}
 \end{figure}
 
@@ -176,10 +198,9 @@ In that paper, the authors use a table of values derived from this formula to de
 \label{dag}
 \end{figure}
 
-Panels (a) and (b) in Figure \ref{dag} show two graphical representations of the model. As explained in \cite{neal2000}, while sampling methods based on $a)$ exist, it is more efficient to decouple the process partitioning the $(\beta_g,\sigma_g)$ into clusters whose locations are realizations from the base measure, $Q$. This is done by introducing a latent variable, $\zeta_g$, taking values on the positive integers with the discrete distribution given by $Pr(\zeta_g=k)=\pi_k$. These latent variables generate a random partition of the `genes' into groups, with $(\beta_g,\sigma^2_g)=(\tilde{\beta}_k,\tilde{\sigma^2}_k)$ for all $g$ where $\zeta_g=k$. The expanded form of the model is shown in $b)$.
+Panels (a) and (b) in Figure \ref{dag} show two graphical representations of the model. As explained in \cite{neal2000}, while sampling methods based on $a)$ exist, it is more efficient to decouple the process partitioning the $(\beta_g,\sigma_g)$ into clusters whose locations are realizations from the base measure, $Q$. This is done by introducing a latent variable, $\zeta_g$, taking values on the positive integers with the discrete distribution given by $Pr(\zeta_g=k)=\pi_k$. These latent variables generate a random partition of the components into clusters, with $(\beta_g,\sigma^2_g)=(\tilde{\beta}_k,\tilde{\sigma^2}_k)$ for all $g$ where $\zeta_g=k$. The expanded form of the model is shown in $b)$.
 
-Our Gibbs sampler is based on that proposed by \citet{ishwaran2000}. In contrast to prior approaches to MCMC, detailed in \citet{neal2000}, which can be classified as ``marginal" methods, Ishwaran and Zarepour presented their ``blocked" Gibbs sampler which allows approximate inference for DPM models. Unlike the marginal Gibbs samplers, which update the cluster allocation for each
-`gene', conditional on all other allocations, the blocked sampler jointly updates all cluster allocations independently. Being able to do so is advantageous when $G$ is large, since it becomes possible to do a large portion of the necessary computation using many parallel processes which can be executed concurrently. As we can see from Figure \ref{dag}, $\zeta_g$ are conditionally independent given $\mathcal{P}$. This is problematic since $\mathcal{P}=\sum_{k=1}^\infty \pi_k \delta_{(\beta_k,\sigma^2_k)}$ is an infinite mixture. \cite{ishwaran2001} showed that, due to the stochastic ordering of the $\pi_k$, $\mathcal{P}$ can be well-approximated by $\mathcal{P}_K=\sum_{k=1}^K \pi^*_k \delta_{(\beta_k,\sigma^2_k)}$, letting $\pi_k^*=\pi_k$ for $k<K$ and $\pi_K^* = 1-\sum_{k=1}^{K-1} \pi_k$. The authors provide an approximate lower bound to the $L_1$ distance between $\mathcal{P}_K$ and $\mathcal{P}$ as a function of $G$, $K$ and $\alpha$ and argue that because the bound decreases exponentially with $K$, it should be possible in practice to use a hierarchical model based on $\mathcal{P}_K$ that is virtually indistinguishable from one based on $\mathcal{P}$.
+Our Gibbs sampler is based on that proposed by \citet{ishwaran2000}. In contrast to prior approaches to MCMC, detailed in \citet{neal2000}, which can be classified as ``marginal" methods, Ishwaran and Zarepour presented their blocked Gibbs sampler which allows approximate inference for DPM models. Unlike the marginal Gibbs samplers, which update the cluster allocation for each component, conditional on all other allocations, the blocked sampler jointly updates all cluster allocations independently. Being able to do so is advantageous when $G$ is large, since it becomes possible to do a large portion of the necessary computation using many parallel processes which can be executed concurrently. As we can see from Figure \ref{dag}, $\zeta_g$ are conditionally independent given $\mathcal{P}$. This is problematic since $\mathcal{P}=\sum_{k=1}^\infty \pi_k \delta_{(\beta_k,\sigma^2_k)}$ is an infinite mixture. \cite{ishwaran2001} showed that, due to the stochastic ordering of the $\pi_k$, $\mathcal{P}$ can be well-approximated by $\mathcal{P}_K=\sum_{k=1}^K \pi^*_k \delta_{(\beta_k,\sigma^2_k)}$, letting $\pi_k^*=\pi_k$ for $k<K$ and $\pi_K^* = 1-\sum_{k=1}^{K-1} \pi_k$. The authors provide an approximate lower bound to the $L_1$ distance between $\mathcal{P}_K$ and $\mathcal{P}$ as a function of $G$, $K$ and $\alpha$ and argue that because the bound decreases exponentially with $K$, it should be possible in practice to use a hierarchical model based on $\mathcal{P}_K$ that is virtually indistinguishable from one based on $\mathcal{P}$.
 
 Applying this truncation in our model is acheived by setting $\nu_K=1$. We then have
 
@@ -284,13 +305,13 @@ We now direct attention to some differences in implementation, compared to tradi
 
 GPUs are usually subservient to a host CPU: the executing program is run on a CPU which turns over control periodically to the GPU to run specific tasks. These tasks, or ``kernels", follow the single instruction, multiple data (SIMD) paradigm. Each core on the GPU is assigned to work on a specific chunk of memory, but all cores execute the same program. Each instance of the program is called a ``thread". It is desirable to avoid branching logic in kernels, in part because the GPU cores are relatively slow, so branching can easily lead to high latency. The best results are obtained by having all threads proceed in lockstep.
 
-The GPU has its own memory system. Because copying memory from host (CPU) to device (GPU) and visa versa is slow, if possible, data input should be copied only once from the host CPU to GPU memory and when the task is completed, it should be copied once back only once to the CPU.
+The GPU has its own memory system. Because copying memory from host (CPU) to device (GPU) and visa versa is relatively slow, care should be taken to excessive copying from host to device and back. Ideally, necessary inputs are copied to device memory once, and any large output objects produced by the device are kept in device memory until they are complete, at which point they are copied back to the host all at once.
 
-When programming for the CPU, memory accesses tend to be fast. On the GPU, while the thread local memory is fast, its size is limited, and reading and writing from global memory is slow. Therefore, kernels need to limit both reads and memory allocation, or else the potential gain in speed due to parallelism will be lost due to memory bottlenecks.
+When programming for the CPU, memory accesses tend to be fast. On the GPU, while the thread-local (``shared") memory is fast, reading and writing from global memory is slow. Therefore, when writing kernels, one should avoid both unnecessary reading and writing from global device memory. This can often be accomplished by copying values needed more than once to variables or ``shared" arrays, for fast access. However, thread-local memory is quite limited. A good rule of thumb is to write kernels to be relatively simple, so that the memory requirements are low.
 
 Threads are themselves organized into ``warps". When data is read from global memory, it reads not one address at a time, but in chunks to minimize overhead costs. To take advantage of this, consecutively indexed threads should use data from memory at consecutive addresses. When this happens, the reads are ``coalesced". If consecutive threads access addresses that are distant to one another, reads are not coalesced, which will make memory transfer inefficient, hence the program will tend to be slow.
 
-For more specifics on GPU computing for statistics, see \citet{suchard}. In the following subsections, we use some examples to demonstrate some instances where parallelism can help to accelerate routine computation.
+For more specifics on GPU computing for statistics, with an emphasis on mixture models, see \citet{suchard}. In the following subsections, we use some examples to demonstrate some instances where parallelism can help to accelerate routine computation.
 
 \subsection{Routines}
 \label{sec:routines}
@@ -388,12 +409,12 @@ Parallel scans are used in various ways in our MCMC algorithm. For example, the 
 \label{subsec:gibbs-revisited}
 Owing to conjugacy, the full conditional distributions of our Gibbs sampler are known distributions and are easy to simulate from. By simulating a drawing from each full conditional per iteration of the Markov chain, the sequence of draws converge to a set of draws from the posterior distribution. There are opportunities to exploit parallelism within some of these Gibbs steps because of conditional independence among blocks of parameters. 
 
-Insofar as the computation for these full conditionals depends on the data, it is only through summary statistics, which can be partially pre-computed (at the gene level). Therefore, $y_g^\top W_g y_g$, $y_g^\top W_g X$, and $X^\top W_g X$ are computed once, prior to sampling, and saved in device memory. Also, in order to coalesce memory accesses for different steps, $\{y_g^\top W_g X\}_{1:G}$ is stored in two ways; row-wise and column-wise.
+Insofar as the computation for these full conditionals depends on the data, it is only through summary statistics, which can be partially pre-computed (at the component level). Therefore, $y_g^\top W_g y_g$, $y_g^\top W_g X$, and $X^\top W_g X$ are computed once, prior to sampling, and saved in device memory. Also, in order to coalesce memory accesses for different steps, $\{y_g^\top W_g X\}_{1:G}$ is stored in two ways; row-wise and column-wise.
 
 Another strategy that we use in an effort to coalesce memory accesses is to adhere to the structure of arrays ("SoA") approach \citep{thrustslides}. In order to do so, it is necessary to organize the inputs and outputs for a kernel computing $f(A_i,B_i)=C_i$ so that $A, B$ and $C$ can be accessed like a ``zipped" set of ranges with a common index, i.e. $(A,B,C)_i = (A_i,B_i,C_i)$. Because of large number of operations required, we wanted to avoid sorting and/or copying to acheive the organization required for SoA. The solution was to use fancy iterators which enable arbitrary user-specified access patterns. If, for example, we wanted to calculate $f(A_i,B_j)=C_{ij}$ for $i=1,\ldots,I$, $j=1,\ldots,J$, we can recast the problem as $f(\tilde{A}_k,\tilde{B}_k)=\tilde{C}_k$ so that $\tilde{A}_k=A_{\mbox{floor}(k/J)+1}$, $\tilde{B}_k=B_{(k+1) \mod I +1}$ and $\tilde{C}$ is a 1-d array with $IJ$ elements where $\tilde{A},\tilde{B}$ are just virtual arrays which actually just provide a map to the memory stored in $A$ and $B$. 
 
 \paragraph{Allocation parameters}
-The computational complexity for this step is $O(GKp^2)$. Fortunately, computation of the unnomalized multinomial weights is an embarassingly parallel problem. For numerical stability, these weights are computed on the log scale. From (\ref{zetafull}),
+The computational complexity for this step is $O(GKp^2)$. Fortunately, computation of the unnormalized weights is an embarassingly parallel problem. For numerical stability, these weights are computed on the log scale. From (\ref{zetafull}),
 \begin{equation}
 \label{logweight}
 \log Pr(\zeta_g=k|\cdot) = constant + \log \pi_k -N \log \sigma_k - \frac{1}{2\sigma^2_k}\left(y_g^\top W_g y_g - 2y_g^\top W_g X \beta_k + \beta^\top X^\top W_g X \beta \right).
@@ -401,7 +422,7 @@ The computational complexity for this step is $O(GKp^2)$. Fortunately, computati
 
 In our implementation, first, separate kernels compute a) $y_g^\top W_g X \beta_k$ and b) $\beta^\top X^\top W_g X \beta$. a) reduces to a matrix multiplcation problem, for which optimized software has been developed for the GPU. To see this, let $B^\top D$, where $\tilde{\beta}_k$ form the columns of $B$, and $X^\top W_g y_g$ form the columns of $D$. b) is accomplished using the SoA approach. Once a) and b) have been computed and stored in global memory, (\ref{logweight}) is computed, again using an SoA approach.
 
-To perform the categorical sampling of $\zeta$, we first perform a cumulative sum/scan of the weights (using log-sum-exp for numerical stability) for each gene. Define $S_{g,k}$ to be the $k^{th}$ partial log sum for gene $g$. Next, we draw $log U_g$, $U_g \sim \op{U}(0,1)$ add add the respective total log sum, $S_{g,K}$, obtaining $V_g = \log U_g + S_{g,K}$. Next, we have a kernel evaluate the comparison, $S_{g,k}<V_g$, returning $1$ if true and $0$ if false. The resulting $G\times K$ array is then reduced over each value of $g$, the result updating $\zeta$.
+To perform the categorical sampling of $\zeta$, we first perform a cumulative sum/scan of the weights (using log-sum-exp for numerical stability) for each component. Define $S_{g,k}$ to be the $k^{th}$ partial log sum for component $g$. Next, we draw $log U_g$, $U_g \sim \op{U}(0,1)$ add add the respective total log sum, $S_{g,K}$, obtaining $V_g = \log U_g + S_{g,K}$. Next, we have a kernel evaluate the comparison, $S_{g,k}<V_g$, returning $1$ if true and $0$ if false. The resulting $G\times K$ array is then reduced over each value of $g$, the result updating $\zeta$.
 
 \paragraph{Cluster atoms}
 A prerequisite to drawing from the full conditional distribution for the cluster atoms is to compute cluster summary statistics. Although this seems fairly straightforward, consisting of a series of reductions, there is an additional complication in that the values to reduce are not contiguous, as the groups being determined by the current value of $\zeta$. Rather than sorting (and copying) the data for each summary, we sort $\zeta$ storing both the sorted vector as well as the permutation that produced it. Using the stored permutation as a map for the summands, such as $y_g^\top W_g y_g$, we compute the corresponding summaries, $\sum_{g:\zeta_g=k}y_g^\top W_g y_g$, as if they were sorted using a specialized reduce algorithm, which reduces elements with a common key, the key being given by (sorted) $\zeta$. Note that this produces cluster summaries only for occupied clusters. Since the conditional distribution for cluster $k$ depends on ``updated" prior parameters that represent a combination of the data and the priors, it is convenient to fill a $K$-dimensional parameter vector, do the required computation for the occupied clusters, and then update the $K$-dimensional vector so that draws can be performed for all clusters in parallel.
@@ -458,7 +479,7 @@ The scalar parameter $\alpha$ depends only on the constants $K$, $a_\alpha$ and 
   % approximation. To avoid this problem, we reorder the cluster indices by their current value of $\pi_k$ after a short initial run, then proceed to subsequent burn-in iterations.
 }
 
-  We initialize our chains as follows. Using the ranges of independent estimates of the gene-specific parameters, we set a regular $(p+1)$-dimensional grid. Using the base measure, we sort the grid values by their prior densities in descending order, retaining the first $K$. We set $\pi_k=1/K$ for all $k=1,\ldots,K$ and $\alpha$ to 1. Next we run the sampler for several thousand iterations. The initialization is taken to be the last iteration of the first chain, but with the indices reordered in descending order by $\pi$. The purpose for reordering is that, in the first chain, it is common for the last cluster to become occupied early and never become unoccupied. This is undesireable, as it undermines the quality of the truncation approximation. Reordering the indices after most of the clusters have become established seems to correct the problem (provided that $K$ is selected to be large enough.)
+  We initialize our chains as follows. Using the ranges of independent estimates of the component-specific parameters, we set a regular $(p+1)$-dimensional grid. Using the base measure, we sort the grid values by their prior densities in descending order, retaining the first $K$. We set $\pi_k=1/K$ for all $k=1,\ldots,K$ and $\alpha$ to 1. Next we run the sampler for several thousand iterations. The initialization is taken to be the last iteration of the first chain, but with the indices reordered in descending order by $\pi$. The purpose for reordering is that, in the first chain, it is common for the last cluster to become occupied early and never become unoccupied. This is undesireable, as it undermines the quality of the truncation approximation. Reordering the indices after most of the clusters have become established seems to correct the problem (provided that $K$ is selected to be large enough.)
 
 
 %Figure \ref{fig:max-id} shows traceplots of a series of Markov chains where reordering has been applied to each. The top frame shows the maximum occupied cluster ID and the bottom frame shows the value of $\alpha$. This example is simulated data with $G=40,000,\, p=6,\, \mbox{and } K=8000$.
@@ -475,14 +496,14 @@ The scalar parameter $\alpha$ depends only on the constants $K$, $a_\alpha$ and 
 \label{subsec:output}
 Because of the dimensionality of the problem is large, it is cumbersome to save all of the MCMC samples. Following the approach in \citet{landau}, we preselect a small number of parameters for which we do save each iteration, but for the rest we first determine which functions of those parameters are of interest and use online algorithms that use running sums to update our estimates of those functions. The class of estimates we calculate fall into two categories,
 \begin{enumerate}
-\item expectations of the gene-specific parameters and their squares, i.e. $\op{E} \beta_g,\, \op{E} \beta_g^2,\, \op{E}\sigma_g,\, \op{E}\sigma_g^2$ and 
-\item gene-specific posterior probabilities of conjunctions of linear
+\item expectations of the component-specific parameters and their squares, i.e. $\op{E} \beta_g,\, \op{E} \beta_g^2,\, \op{E}\sigma_g,\, \op{E}\sigma_g^2$ and 
+\item component-specific posterior probabilities of conjunctions of linear
   inequalities of the elements of $\beta_g$, i.e.,
   $\op{Pr}\left(c_1\beta_g > 0 \land \ldots \land c_t\beta_g > 0\right)$.
 \end{enumerate}
 Updates of these quantities are embarrasingly parallel across $g$, so are well suited to the GPU. The update in 1) is done elementwise, based on a running sum, and the update in 2) can be decomposed into four tasks, a matrix multiplication to compute $C\beta$, an elementwise evaluation of the sign of the value, a parallel setwise reduction using the minimum to evaluate each conjunction, and finally an update of the estimator (using the same functionality as 1)).
 
-We also save and return several low-dimensional parameters which provide some information on the overall behavior of the sampler: the number of occupied clusters, the maximum id of the occupied clusters and $\alpha$, the concentration parameter. We also optionally return samples of selected gene-specific parameters and a user-specified number of draws of $\mathcal{P}$.
+We also save and return several low-dimensional parameters which provide some information on the overall behavior of the sampler: the number of occupied clusters, the maximum id of the occupied clusters and $\alpha$, the concentration parameter. We also optionally return samples of selected component-specific parameters and a user-specified number of draws of $\mathcal{P}$.
 
 
 \section{Simulation Study}
@@ -491,9 +512,9 @@ To assess the time per iteration and time to convergence, we simulated data and 
 
 We identified several factors that could potentially impact the running time: the dimension of the regression coefficients, $p$, the number of groups, $G$, and truncation limit, $K$. The sample size was chosen to be proportional to the $p$, $N=4p$. Two simulated data sets were generated and analyzed for each combination of $p=2,4,6$, $G=2^12,2^13,2^14$ and $K=2^12,2^11,2^12$.
 
-For the simulations, we first generated a distribution $P$ (as in Eq. \ref{eq:P}). We did this by first producing $K_t=\lfloor \sqrt{G}\rfloor$ cluster components, $\tilde{\beta}_k$, which were generated independently from a multivariate normal distribution with diagonal covariance $C$. We chose to have the variance decrease with the dimension, $C_{jj} = 3/j^2$. This decision was somewhat arbitrary, but is consistent with empirical observation that the proportion of significant effects is often inversely related to the dimension of the design matrix in regression. The cluster variances, $\tilde{\sigma^2}_k$ were generated independently from a gamma distribution. The gene-specific coefficients, $\beta_g$ and variances, $\sigma^2_g$, were chosen by drawing an index $k$ uniformly with replacement from the set $\{1,...,K_t\}$. Finally, conditional on $(\beta_g,\sigma^2_g)$, log-expression data were generated from the normal distribution as in Equation \ref{eq:data}.
+For the simulations, we first generated a distribution $P$ (as in Eq. \ref{eq:P}). We did this by first producing $K_t=\lfloor \sqrt{G}\rfloor$ cluster components, $\tilde{\beta}_k$, which were generated independently from a multivariate normal distribution with diagonal covariance $C$. We chose to have the variance decrease with the dimension, $C_{jj} = 3/j^2$. This decision was somewhat arbitrary, but is consistent with empirical observation that the proportion of significant effects is often inversely related to the dimension of the design matrix in regression. The cluster variances, $\tilde{\sigma^2}_k$ were generated independently from a gamma distribution. The component-specific coefficients, $\beta_g$ and variances, $\sigma^2_g$, were chosen by drawing an index $k$ uniformly with replacement from the set $\{1,...,K_t\}$. Finally, conditional on $(\beta_g,\sigma^2_g)$, log-expression data were generated from the normal distribution as in Equation \ref{eq:data}.
 
-The prior distributions used to analyze the simulated data were set to the true values for $m_\beta = m$, and $C_\beta = C$. The inverse gamma parameters $a_\sigma^2$ and $b_\sigma^2$ were both set to 1. Note that $\tilde{\sigma}^2_k$ come from a gamma distribution, rather than an inverse gamma, to avoid very large values, as the inverse gamma has a much heavier tail. The prior for $\alpha$ is the one described in section \ref{sec:model}, with the prior expectation close or equal to $K_t$.depend on the independent estimates of the gene-specific parameters and the number of genes as described in Section \ref{sec:inference}.
+The prior distributions used to analyze the simulated data were set to the true values for $m_\beta = m$, and $C_\beta = C$. The inverse gamma parameters $a_\sigma^2$ and $b_\sigma^2$ were both set to 1. Note that $\tilde{\sigma}^2_k$ come from a gamma distribution, rather than an inverse gamma, to avoid very large values, as the inverse gamma has a much heavier tail. The prior for $\alpha$ is the one described in section \ref{sec:model}, with the prior expectation close or equal to $K_t$.depend on the independent estimates of the component-specific parameters and the number of components as described in Section \ref{sec:inference}.
 
 For simplicity, we chose to focus on the effective number of samples for $\alpha$ because it depends on $\pi_K$, a parameter which is sensitive to changes in the number of occupied clusters and the maximum occupied cluster index. Thus, we expect that the efficiency of sampling for alpha is a reasonable proxy for the overall efficiency of the sampler.
 
@@ -518,7 +539,7 @@ The left panel of Figure \ref{timing} shows the average time per iteration at ea
 \begin{figure}[!h]
 \centering
 \includegraphics[width=\textwidth]{comb-timing}
-\caption[Average number of seconds per MCMC sample]{\small Left: Average seconds required per MCMC sample across for two simulated datasets at each level of K, the truncation limit, G, then number of genes, and p , the dimension of regression coefficient. K has the largest impact on computation time, followed by G. The effect of p is small over the range considered. Right: Average seconds per effective sample across for two simulated datasets at each level of K, the truncation limit, G, then number of genes, and p , the dimension of regression coefficient. Interestingly, the efficiency in sampling for $\alpha$ increases with p in our simulations. This might be explained by an increased separation between clusters, leading to greater stability in the partition defined by the allocation parameters.}%
+\caption[Average number of seconds per MCMC sample]{\small Left: Average seconds required per MCMC sample across for two simulated datasets at each level of K, the truncation limit, G, then number of components, and p , the dimension of each regression coefficient, $\beta_g$. K has the largest impact on computation time, followed by G. The effect of p is small over the range considered. Right: Average seconds per effective sample across for two simulated datasets at each level of K, the truncation limit, G, then number of genes, and p , the dimension of regression coefficient. Interestingly, the efficiency in sampling for $\alpha$ increases with p in our simulations. This might be explained by an increased separation between clusters, leading to greater stability in the partition defined by the allocation parameters.}%
 \label{timing}
 \end{figure}
 
@@ -608,11 +629,12 @@ p & $2^{\beta_3}$ & 0.5 & 0.4 & 0.6 \\
 \label{sec:analysis}
 \citet{paschold} produced an RNA-seq data set for gene expression of root tissue from 4 samples for each of two recombinant inbred maize genotypes, B73 and Mo17. Each sample was obtained from a combination of 10 primary roots from seedlings 3.5 days after germination. Illumina's Genome Analyzer II was used for sequencing. Two flow cells were utilized, with four replicates of each genotype split across flowcells. Among the researchers' aims was to identify genes which were differentially expressed in these parental lines.
 
-\paragraph{Normalization} For various technical reasons, normalization of the table columns (`between-sample' normalization) is needed to adjust for systematic differences arising from technical factors unrelated to the quantities of interest.
+\paragraph{Normalization and transformation}
+For RNA-seq data, column-wise normalization (often referred to as `between-sample' normalization) is required to adjust for systematic differences arising from the sequencing process. These systematic differences obfuscate, and are irrelevant to, the quantities of interest.
 
-For example, in RNA-seq experiments, the total of all read counts (`library size') for a sample will vary, in part, due to differences in sequencing depth. A simple adjustment for library size is to convert total read counts to a relative proportion, such as counts per million (cpm). A criticism of this approach to normalization is that the library size may be driven primarily by a few highly sequenced genes, making this approach too volatile. More robust approaches have been proposed; for further discussion, see \citet{oshlack2010rna}.
+For example, the total of all read counts (`library size') for a sample will vary, in part, due to differences in sequencing depth or total read count which lead to some columns having significantly higher total reads than others. A simple fix is to divide, for each sample and gene, by the library size of the sample. Unfortunately, this approach to normalization is problematic because the library size is often driven primarily by a few highly sequenced genes, making this approach too volatile. Fixes to this problem have been proposed; we used the trimmed mean of M-values (TMM) method of \citet{} to obtain an `effective library size'. Other approaches have been proposed; for further discussion, see \citet{oshlack2010rna}.
 
-\paragraph{Transformation} Because the data are non-negative and variability in expression tends to increase with the overall expression,  gene expression data is typically analyzed on a logarithmic scale, with difference in expression being multiplicative. The large number of zero counts usually present in RNA-seq data, preclude taking logarithms of the raw data. Using a generalized linear modeling approach avoids this problem by specifying a discrete probability model for the counts, while the log-mean expression is modeled as a linear function of the model parameters.
+Because the data are non-negative and variability in expression tends to increase with the overall expression,  gene expression data is typically analyzed on a logarithmic scale, with difference in expression being multiplicative. Because of the presence of zeros, we add one to each count before taking logarithms and subtracting the log of the effective library size: $y_{gn} = \log(R_{gn}+1) - \log(L_{n})$, where $R_{gn}$ is the number of reads for sample $n$, gene $g$ and $L_{n}$ is the effective library size for the $n^{th}$ sample.
 
 For computational reasons, we assume a normal model for the data after transforming it. First, we compute normalization factor $c_i$ for each column; second, we take logarithms of the data, after adding 1, and apply the normalization on the log scale, .i.e.
 $$\mbox{transformed log-count in column }i = \log (\mbox{original count in column }i+1) + \log(c_i)$$. \iftoggle{thesis}{The result after applying these steps to the data in Table \ref{tab:data} are shown in Table \ref{tab:data-transformed}}.
@@ -743,7 +765,9 @@ Figure \ref{pairs-3-methods} displays pairs of parameter estimates obtained from
 \label{sec:discussion}
 Although quite computationally intensive, nonparametric Bayesian methods are becoming computationally feasible in applications, even for fairly sizable datasets, such as gene expression profiling. One way to achieve computational feasibility is through adapting existing procedures to take advantage of massively parallel systems like the GPU.
 
-We have found some evidence that our proposed procedure scales well with the size of the data ($G$), as well as the dimension of the problem ($V$), and is approximately quadratic in the number of clusters required to approximate the latent infinite mixture ($K$).
+The large number of zero counts usually present in RNA-seq data, preclude taking logarithms of the raw data. We have circumvented the problem by adding one to the counts prior to normalization. There is theoretical support for the use of a Poisson model for RNA-seq counts absent any biological variation, a fact which is often used to motivate the use of negative binomial distribution for RNA-seq data, the negative binomial being a gamma mixture of Poissons. We opted to use a normal model for the log-frequency rather to model the counts directly. It would be possible to modify our method to use a negative binomial model for the counts and replace the  
+
+We have found that our proposed procedure scales well and is computationally feasible with data sets containing tens of thousands of components like that which is common currently with gene expression data. In addition, design matrices up to 6 do not present a computational problem for the procedure. For larger sample sizes, we would expect that a larger number of clusters would be required to explain the data. Increasing $K$ is a computational burden; we found the time per effective iteration to be quadratic in $K$. Also, the potential benefits of borrowing information diminish with sample size, reducing the potential benefit of a hierarchical model.
 
 \appendix
 \section{CUDA libraries}
