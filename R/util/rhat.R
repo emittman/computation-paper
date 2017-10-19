@@ -43,9 +43,13 @@ gelman.factors <- function(..., n_iter){
   within.chain.sigma <- lapply(chains, function(ch){
     with(ch$summaries, (meansquares_sigmas - means_sigmas^2)*n_iter/(n_iter-1))
   })
+  within.chain.alpha <- sapply(chains, function(ch){
+    with(ch$samples, var(alpha))
+  })
   #average within chain variance
   W.beta <- apply(plyr::laply(within.chain.beta, identity),c(2,3),mean)
   W.sigma <- apply(plyr::laply(within.chain.sigma, identity),2,mean)
+  W.alpha <- mean(within.chain.alpha)
   
   #estimate overall means
   ovrl.beta.mean <- apply(plyr::laply(chains, function(ch){
@@ -54,6 +58,11 @@ gelman.factors <- function(..., n_iter){
   ovrl.sigma.mean <- apply(plyr::laply(chains, function(ch){
     ch$summaries$means_sigmas}),
     2,mean)
+  ch.means.alpha <- sapply(chains, function(ch){
+    mean(ch$samples$alpha)
+  })
+  ovrl.alpha.mean <- mean(ch.means.alpha)
+  
   
   #between chain squared differences
   btween.sq.diff.beta <- lapply(chains, function(ch){
@@ -62,22 +71,28 @@ gelman.factors <- function(..., n_iter){
   btween.sq.diff.sigma <- lapply(chains, function(ch){
     with(ch$summaries, (means_sigmas - ovrl.sigma.mean)^2)
   })
+  btween.sq.diff.alpha <- sapply(ch.means.alpha, function(ch){
+    (ch - ovrl.alpha.mean)^2
+  })
   
   #between chain variances
   B.beta <- apply(plyr::laply(btween.sq.diff.beta, identity),
                   c(2,3), function(x) sum(x)*n_iter/(m-1))
   B.sigma <- apply(plyr::laply(btween.sq.diff.sigma, identity),
                    2, function(x) sum(x)*n_iter/(m-1))
+  B.alpha <- sum(btween.sq.diff.alpha)/(m-1)
   
   #estimate target variance
   targVar.beta <- (1-1/n_iter)*W.beta + 1/n_iter*B.beta
   targVar.sigma <- (1-1/n_iter)*W.sigma + 1/n_iter*B.sigma
+  targVar.alpha <- (1-1/n_iter)*W.alpha + 1/n_iter*B.alpha
   
   #calculate Rhat
   Rhat.beta <- sqrt(targVar.beta/W.beta)
   Rhat.sigma <- sqrt(targVar.sigma/W.sigma)
+  Rhat.alpha <- sqrt(targVar.alpha/W.alpha)
   
-  list(Rhat.beta, Rhat.sigma)
+  list(beta=Rhat.beta, sigma=Rhat.sigma, alpha=Rhat.alpha)
   
 }
 
