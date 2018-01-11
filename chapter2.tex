@@ -4,16 +4,16 @@
 \newcommand{\code}{\texttt}
 
 \section{Introduction}
-Experiments or observational studies that produce a large number of measurements for each of a small to moderate number of experimental/observational units present certain statistical challenges. Such problems are increasingly common as technologies produce more and more data. For example, gene expression profiling studies consider comparisons between experimental groups at thousands genes on the genome.
+Experiments or observational studies that produce a large number of measurements for each of a small to moderate number of experimental/observational units present certain statistical challenges. Such problems are increasingly common as technologies produce more and more data. For example, gene expression profiling studies consider comparisons between experimental groups at thousands of genes on the genome.
 
 When similar comparisons are to be made between subjects for each measurement component, the number of errors is likely to be large. Because of this, there is demand for statistical methods that reduce the number of `false positives'. Shrinkage priors are often used to improve inference by borrowing information across components as a moderating influence given the limited information available for a single component. Correlations across measurement components may exist, e.g. interactions among genes, but in such scenarios as we are describing, any attempt at inference would be extremely dubious. Instead, the information being borrowed across components is with regard to between subject comparisons, such as treatment effects in the case of an experiment.
 
 % Consider the model given by $Y_{gi}|x_i \ind F(\theta_{g}| x_i)$, $g=1,\ldots,G$, $i=1,\ldots,N$ with $G\gg N$ and the quantities of interest are functions of $\theta_g$. In this setting, there is potential benefit to borrow information across group level, $g$, to reduce variance.
 
-A common approach is to model component-specific parameters as independent, identically distributed according to some probability distribution, $\mathcal{P}$, belonging to a parametric family of distributions. Under this framework, $\mathcal{P}$ can then be estimated allowing for conditional inference, or a prior distribution can be given on its parameters allowing for fully Bayesian inference. While this approach can be useful in practice, the influence of the choice of a particular parametric family can be considerable. This choice is often not reflective of \textit{a priori} information, but rather due to convention or convenience. Here, the choice of a `nonparametric prior', i.e. a prior distribution over a `large' set of probability distributions, allows one to avoid having to make parameteric assumptions about $\mathcal{P}$. 
+A common approach is to model component-specific parameters as independent, identically distributed according to some probability distribution, $\mathcal{P}$, belonging to a parametric family of distributions. Under this framework, $\mathcal{P}$ can then be estimated allowing for conditional inference, or a prior distribution can be given on its parameters allowing for fully Bayesian inference. While this approach can be useful in practice, the influence of the choice of a particular parametric family can be considerable. This choice is often not reflective of \textit{a priori} information, but rather due to convention or convenience. Here, the choice of a `nonparametric prior', i.e. a prior distribution over a `large' set of probability distributions, allows one to avoid having to make parametric assumptions about $\mathcal{P}$. 
 % The most widely used such prior distribution in the literature of Bayesian nonparametrics is the Dirichlet process (DP).
 
-Much effort has gone into researching methods in the case of gene expression. Several have been released as R packages \citep{edger2010,deseq2014,voom}. A common feature of these methods is that they use between-gene information to estimate the the  mean-variance relationship nonparametrically. This relationship can be key to acheiving statistical power; it involves both biological and technological sources of variation and varies from dataset to dataset \citep{voom}. Empirically, we have observed structure to be present not only between the mean and variance, but also among regression parameter components (see Fig. \ref{pairs-ind-est}). This suggests that between-gene information is available not only to regulate gene-level assessment of variance, but also the estimated effects themselves. While others used random effects models for individual regression components \citep{deseq2014,landau}], they depend on assumptions about the underlying distribution of effects, such as independence, which are contradicted by the data.
+Much effort has gone into researching methods in the case of gene expression. Several have been released as R packages \citep{edger2010,deseq2014,voom}. A common feature of these methods is that they use between-gene information to estimate the the  mean-variance relationship nonparametrically. This relationship can be key to achieving statistical power; it involves both biological and technological sources of variation and varies from dataset to dataset \citep{voom}. Empirically, we have observed structure to be present not only between the mean and variance, but also among regression parameter components (see Fig. \ref{pairs-ind-est}). This suggests that between-gene information is available not only to regulate gene-level assessment of variance, but also the estimated effects themselves. While others used random effects models for individual regression components \citep{deseq2014,landau}], they depend on assumptions about the underlying distribution of effects, such as independence, which are contradicted by the data.
 
 \begin{figure}[ht]
 \centering
@@ -25,9 +25,9 @@ Much effort has gone into researching methods in the case of gene expression. Se
 A special case of gene expression profiling concerning two populations is differential gene expression. Because expression is typically modeled on the log scale, the differential expression at a particular gene, termed `log-fold-change', is the parameter of interest. \citet{liu} proposed a semiparametric model treating the log-fold change parameters as random effects following an unknown distribution, $\mathcal{P}$, where $\mathcal{P}$ is a random distribution arising from a Dirichlet process (DP). In this paper, we modify and extend the approach taken by \cite{liu} to allow nonparametric inference for a large class of gene profiling experiments. In our method, we use a DP to model jointly the distribution of the $p$-dimensional gene-specific regression coefficient, $\beta_g$, and variance, $\sigma^2_g$.
 
 %The parameters of the DP either chosen, specifying a prior distribution on $\mathcal{P}$, or by placing a prior on these parameters. 
-Common practice for Bayesian nonparametric applications is to sample from the joint posterior distribution using a Gibbs sampler. A number of Gibbs sampling algorithms for DP mixture models have been proposed. These can be categorized into two types: `marginal,' where full conditionals are with respect to the joint posterior with the unknown $\mathcal{P}$ integrated out, and `conditional', where $\mathcal{P}$ is also sampled and conditioned on.
+Common practice for Bayesian nonparametric applications is to sample from the joint posterior distribution using a Gibbs sampler. Several Gibbs sampling algorithms for DP mixture models have been proposed. These can be categorized into two types: `marginal,' where full conditionals are with respect to the joint posterior with the unknown $\mathcal{P}$ integrated out, and `conditional', where $\mathcal{P}$ is also sampled and conditioned on.
 
-When $\mathcal{P}$ is not of particular interest, marginal approaches are often preferable. However, for large $G$, these algorithms are not computationally tractable as they require one-at-a-time updating of the cluster assignment for each $g$ conditioning on all $g'\neq g$. On the other hand, conditional Gibbs methods, which depend on the ``stick-breaking" representation of the DP \citet{sethuraman}, are amenable to parallelism because cluster assignment is conditionally independent given $\mathcal{P}$. \citet{suchard} argued for wider use of graphics processing units (GPUs) by statisticians for computationally demanding, parallelizable tasks to acheive large speed-ups in real time. We provide a brief introduction to computing in the massively parallel context, including some general guidelines that can help in designing implementations that are well-suited for the GPU. We demonstrate that using a Dirichlet process mixture as a `shrinkage prior' is feasible in practice by utilizing currently available GPU technology and describe our implementation.
+When $\mathcal{P}$ is not of particular interest, marginal approaches are often preferable. However, for large $G$, these algorithms are not computationally tractable as they require one-at-a-time updating of the cluster assignment for each $g$ conditioning on all $g'\neq g$. On the other hand, conditional Gibbs methods, which depend on the ``stick-breaking" representation of the DP \citet{sethuraman}, are amenable to parallelism because cluster assignment is conditionally independent given $\mathcal{P}$. \citet{suchard} argued for wider use of graphics processing units (GPUs) by statisticians for computationally demanding, parallelizable tasks to achieve large speed-ups in real time. We provide a brief introduction to computing in the massively parallel context, including some general guidelines that can help in designing implementations that are well-suited for the GPU. We demonstrate that using a Dirichlet process mixture as a `shrinkage prior' is feasible in practice by utilizing currently available GPU technology and describe our implementation.
 
 Section \ref{sec:data} introduces the structure of gene expression profiling data suitable for our method and recommended preprocessing steps. Section \ref{sec:model} presents our model for gene expression, which features a hierarchical model for the gene-specific parameters without parametric assumptions. Next, Section \ref{sec:inference} outlines a procedure for posterior sampling based on the blocked Gibbs sampler of \cite{ishwaran2000}. Section \ref{sec:parallel} introduces concepts related to programming for GPU parallelism and discusses details of two important parallel algorithms. The Gibbs sampler is revisited and GPU implementation details are provided. To investigate the properties of our algorithm, in Section \ref{sec:timing} we discuss a study we conducted to assess the time requirement under variable conditions. Section \ref{sec:analysis} presents an analysis of differential expression data and contrasts our results with both a gene-independent analysis and a mixed-effects analysis assuming a multivariate normal distribution on the random effects. Finally, in Section \ref{sec:discussion} we put our proposed method in context, discuss potential applications and consider future directions for research.
 % In summary, to avoid sensitivity to the prior distribution on $\mathcal{P}$, we propose to model it as a truncated Dirichlet process. Advances in computers have seen a rapid increase in the use of Markov Chain Monte Carlo (MCMC) methods for fitting sophisticated statistical models. Because such methods rely on thousands or even millions of simluated draws generated one after another, fast computing is critical to making them computationally feasible. Nonparametric Bayesian methods are no different in this regard, but when the size of the data set gets moderately large, the computational effort required per draw can be enormous as the number of parameters grows with the sample size. Graphics processing units (GPUs) have potential in this area, provided that most of the work can be divided into many parallel tasks which operate on different pieces of memory. By exploiting conditional independence in the model and making use of parallelized algorithms, we demonstrate the feasibility of nonparametric Bayesian modeling in the ``big data" setting of gene expression data.
@@ -60,7 +60,7 @@ Important cases include RNA-seq read counts and microarray data. For these cases
 % Tue Oct 17 15:02:36 2017
 \begin{table}[ht]
 \centering
-\caption{\small Sample of RNA-seq total read counts from \citep{paschold}. Columns names identify samples, including the genotype and a replicate number, from which we can infer the flow cell that was used for sequencing. Gene annotation information (regarding the rows), is not used for in our analysis. The first and last genes listed strongly indicate differential expression between the two inbred maize lines.}
+\caption{\small Sample of RNA-seq total read counts from Paschold et al. (2012). Columns names identify samples, including the genotype and a replicate number, from which we can infer the flow cell that was used for sequencing. Gene annotation information (regarding the rows), is not used for in our analysis. The first and last genes listed strongly indicate differential expression between the two inbred maize lines.}
 \label{tab:data}
 \vspace{.25cm}
 \begin{tabular}{lrrrrrrrr}
@@ -109,7 +109,7 @@ Let
 \label{eq:P}
 \mathcal{P} =\sum_{k=1}^\infty \pi_k \delta_{\left(\tilde{\beta}_k^\top ,\tilde{\sigma}^2_k\right)},
 \end{equation}
-where $\delta_{(.)}$ is the Dirac delta function. Note that although almost sure discreteness is a property applicable to ``draws'' from a DP, the posterior for $\mathcal{P}$ is in fact a mixture of DP \citep{antoniak}. An implication of discretness can be thought of as a ``bet on sparsity"; that there are actually a finite (but unspecified) number of unique values that $(\beta_g^\top,\sigma^2_g)$ can take.  
+where $\delta_{(.)}$ is the Dirac delta function. Note that although almost sure discreteness is a property applicable to ``draws'' from a DP, the posterior for $\mathcal{P}$ is in fact a mixture of DP \citep{antoniak}. An implication of discreteness can be thought of as a ``bet on sparsity"; that there are actually a finite (but unspecified) number of unique values that $(\beta_g^\top,\sigma^2_g)$ can take.  
  The ``atoms" distributed according to $Q$, specified by the product measure
 
 \begin{equation}
@@ -144,11 +144,11 @@ This assumption induces a stochastically decreasing ordering of the weights, so 
 
 \section{Model inference}
 \label{sec:inference}
-We adopt a Bayesian approach for estimation and inference for the DP mixture model described in Section \ref{sec:model}. This requires a specification the completion of a full probability model by specifying prior distributions. Looking at Figure \ref{dag}, which shows the directed acyclical graphs representing the model, specifying a prior amounts to choosing values for model parameters which have no arrows pointing toward them, i.e. whose distribution is not otherwise specified in the model.
+We adopt a Bayesian approach for estimation and inference for the DP mixture model described in Section \ref{sec:model}. This requires a specification the completion of a full probability model by specifying prior distributions. Looking at Figure \ref{dag}, which shows the directed acyclic graphs representing the model, specifying a prior amounts to choosing values for model parameters which have no arrows pointing toward them, i.e. whose distribution is not otherwise specified in the model.
 
 We choose values of $m_\beta,\,C_\beta,\,a_{\sigma^2},\,b_{\sigma^2}$ so that $Q$ puts mass on reasonable values of the $p+1$ dimensional parameters $\left(\tilde{\beta}_g^\top,\tilde{\sigma}^2_g\right)$. First, estimates are computed for each gene independently by ordinary least squares. The hierarchical mean, $m_\beta$ is chosen so the each component, $m_{\beta,j}$, is equal to the median of the estimates for $\beta_{g,j}$. The diagonal elements of the prior covariance matrix, $C_{jj}$, are chosen to be 4 times the sample variance of the $\beta_{g,j}$. The parameters of the inverse gamma are chosen by matching first and second moments, treating the estimates for $\sigma^2_g$ as data.
 
-This can be though of as an empirical Bayes approach. Alternatively, one could also select values based on prior experience. In any case, using informative or weakly informative priors for is important; if $Q$ is chose to be diffuse, that can be overly informative and lead to only few large $\pi_k$ accounting for most of the total probability in the mixture, $\mathcal{P}$ \citep{gelman-book}.
+This can be thought of as an empirical Bayes approach. Alternatively, one could also select values based on prior experience. In any case, using informative or weakly informative priors for is important; if $Q$ is chosen to be diffuse, that can be overly informative and lead to only few large $\pi_k$ accounting for most of the total probability in the mixture, $\mathcal{P}$ \citep{gelman-book}.
 
 The parameter $\alpha$ plays an important role in the model, since it helps to determine how quickly the successive elements of $\pi$ decay, i.e. the number of clusters selected by the model. For computational convenience, we choose the conditionally conjugate prior
 
@@ -173,7 +173,7 @@ In that paper, the authors use a table of values derived from this formula to de
 
 \begin{figure}
 \includegraphics[width=.8\textwidth]{my_dag}
-\caption{\small Directed acyclical graphs of the Bayesian nonparametric hierarchical regression model. Panel $(b)$ introduces latent allocation parameters, $\zeta_g$, which decouple the process which partitions the data into clusters from the distribution which provides the unique values, $(\tilde{\beta_k},\tilde{\sigma}_k^2)$ of the cluster parameters. Solid lines indicate distributional dependency, dashed lines indicate deterministic functional relationships.}
+\caption{\small Directed acyclic graphs of the Bayesian nonparametric hierarchical regression model. Panel $(b)$ introduces latent allocation parameters, $\zeta_g$, which decouple the process which partitions the data into clusters from the distribution which provides the unique values, $(\tilde{\beta_k},\tilde{\sigma}_k^2)$ of the cluster parameters. Solid lines indicate distributional dependency, dashed lines indicate deterministic functional relationships.}
 \label{dag}
 \end{figure}
 
@@ -181,7 +181,7 @@ Panels (a) and (b) in Figure \ref{dag} show two graphical representations of the
 
 Our Gibbs sampler is based on that proposed by \citet{ishwaran2000}. In contrast to prior approaches to MCMC, detailed in \citet{neal2000}, which can be classified as ``marginal" methods, Ishwaran and Zarepour presented their blocked Gibbs sampler which allows approximate inference for DPM models. Unlike the marginal Gibbs samplers, which update the cluster allocation for each component, conditional on all other allocations, the blocked sampler jointly updates all cluster allocations independently. Being able to do so is advantageous when $G$ is large, since it becomes possible to do a large portion of the necessary computation using many parallel processes which can be executed concurrently. As we can see from Figure \ref{dag}, $\zeta_g$ are conditionally independent given $\mathcal{P}$. This is problematic since $\mathcal{P}=\sum_{k=1}^\infty \pi_k \delta_{(\beta_k,\sigma^2_k)}$ is an infinite mixture. \cite{ishwaran2001} showed that, due to the stochastic ordering of the $\pi_k$, $\mathcal{P}$ can be well-approximated by $\mathcal{P}_K=\sum_{k=1}^K \pi^*_k \delta_{(\beta_k,\sigma^2_k)}$, letting $\pi_k^*=\pi_k$ for $k<K$ and $\pi_K^* = 1-\sum_{k=1}^{K-1} \pi_k$. The authors provide an approximate lower bound to the $L_1$ distance between $\mathcal{P}_K$ and $\mathcal{P}$ as a function of $G$, $K$ and $\alpha$ and argue that because the bound decreases exponentially with $K$, it should be possible in practice to use a hierarchical model based on $\mathcal{P}_K$ that is virtually indistinguishable from one based on $\mathcal{P}$.
 
-Applying this truncation in our model is acheived by setting $\nu_K=1$. We then have
+Applying this truncation in our model is achieved by setting $\nu_K=1$. We then have
 
 \begin{equation*}
 \zeta_g \sim \op{Cat}_K(\pi) = \sum_{k=1}^K \pi_k \delta_{k}, \mbox{ i.e. } Pr(\zeta_g=k)=\pi_k.
@@ -197,11 +197,12 @@ Applying this truncation in our model is acheived by setting $\nu_K=1$. We then 
 
 Applying Bayes' theorem, the posterior distribution, up to a constant, is
 \begin{equation*}
-p(\beta,\sigma^2,\mathcal{P},\alpha|y) = p(\zeta, \tilde{\beta},\tilde{\sigma^2},\nu,\alpha | y) \propto p(y|\tilde{\beta},\tilde{\sigma^2},\zeta) p(\zeta|\nu) p(\nu|\alpha)p(\tilde{\beta},\tilde{\sigma^2})
+p(\beta,\sigma^2,\mathcal{P},\alpha|y) = p(\zeta, \tilde{\beta},\tilde{\sigma^2},\nu,\alpha | y) \propto p(y|\tilde{\beta},\tilde{\sigma^2},\zeta) \times p(\zeta|\nu) \times p(\nu|\alpha) \times p(\tilde{\beta},\tilde{\sigma^2})
 \end{equation*}
-\begin{equation*}
-= \prod_{g=1}^G \left[ \op{N}(y_g;\,\beta_{\zeta_g},\sigma^2_{\zeta_g})\; \op{Cat}_K(\zeta_g;\, \pi(\nu)) \right] \prod_{k=1}^K \left[ \op{Be}(\nu_k;\, 1, \alpha)\; \op{N}(\tilde{\beta_k};\,m_\beta, C_\beta)\;\op{IG}(\tilde{\sigma}^2_k;\,a_{\sigma^2},b_{\sigma^2})\right] \op{Ga}(\alpha;a_\alpha,b_\alpha)
-\end{equation*}
+\begin{align*}
+= & \prod_{g=1}^G \left[ \op{N}(y_g;\,\beta_{\zeta_g},\sigma^2_{\zeta_g})\times \op{Cat}_K(\zeta_g;\, \pi(\nu)) \right] \times \\
+& \prod_{k=1}^K \left[ \op{Be}(\nu_k;\, 1, \alpha) \times \op{N}(\tilde{\beta_k};\,m_\beta, C_\beta) \times \op{IG}(\tilde{\sigma}^2_k;\,a_{\sigma^2},b_{\sigma^2})\right] \times \op{Ga}(\alpha;a_\alpha,b_\alpha)
+\end{align*}
 The first equality follows from the  invariance to reparameterization of the posterior distribution; that is, while we are interested in the posterior distribution of the $\beta_g$ and $\sigma_g$ (diagram $a)$ in Figure \ref{dag}), we lose nothing by formulating the problem in terms of $\zeta_g$, $\tilde{\beta}_k$ and $\tilde{\sigma}_k$ (diagram $b)$). The last equality follows from the product rule of conditionally independent random variables.
 
 \subsection{Full conditionals}
@@ -277,8 +278,8 @@ The full conditional for cluster location, $\tilde{\beta}_k$:
 
 \section{Computation on the GPU}
 \label{sec:parallel}
-\subsection{General Remarks}
-Modern GPUs offer hundreds to thousands of cores and are capable of handling over a million of concurrent processes. Compared with multi-core CPUs, which typically boast 16 or fewer processors, this suggests a large benefit to using GPUs to exploit parallelism. 
+\subsection{General remarks}
+Modern GPUs offer hundreds to thousands of cores and are capable of handling over a million concurrent processes. Compared with multi-core CPUs, which typically boast 16 or fewer processors, this suggests a large benefit to using GPUs to exploit parallelism. 
 %While these benefits are becoming more widely recognized and gaining visibility through some large software projects such as Tensorflow, as with any technology there limitations, trade-offs and can be additional complications. 
 We now direct attention to some differences in implementation, compared to traditional CPU programming, that are required when porting code to a GPU platform.
 
@@ -296,7 +297,7 @@ For more specifics on GPU computing for statistics, with an emphasis on mixture 
 \label{sec:routines}
 \subsubsection{Reductions}
 \label{subsec:reduce}
-On the GPU, individual processors are slow, and asynchronous tasks can result in many idle threads. In order to achieve speed-ups, algorithms must exploit parallelism and do so in a way that respects the limitations of the hardware. A basic example, which we use heavily, is reduction. Given some data in memory, $a_1, a_2, \ldots, a_n$, and an \textit{associative} binary operator $+$, the problem is to compute $s_{1:n}=\sum_{i=1}^n a_i$. The parallelized reduction algorithm is given below in Algorithm \label{reduce}, and is illustrated in the top half of the diagram shown in Figure \ref{scan-illustration}.  
+On the GPU, individual processors are slow, and asynchronous tasks can result in many idle threads. In order to achieve speed-ups, algorithms must exploit parallelism and do so in a way that respects the limitations of the hardware. A basic example, which we use heavily, is reduction. Given some data in memory, $a_1, a_2, \ldots, a_n$, and an \textit{associative} binary operator $+$, the problem is to compute $s_{1:n}=\sum_{i=1}^n a_i$. The parallelized reduction algorithm is given below in Algorithm \ref{reduce}, and is illustrated in the top half of the diagram shown in Figure \ref{scan-illustration}.  
 
 \begin{pseudocode}[ruled]{Parallel-Reduce}{a}
 \label{reduce}
@@ -362,7 +363,7 @@ In practice, there are physical constraints that require modifications to Parall
 
 Both Parallel-Reduce and Parallel-Scan presented above require $O(\log_2(n))$ steps compared to the $O(n)$ required for a serial implementation. 
 %According to \citet{blelloch1990}, if $P$ processors are available, the time required to scan $n$ elements is $O(n/P + \log_2P)$. 
-The actual speed-up attained depends on hardware and implementation. \citet{harris-scan} implemented Parallel-Scan for GPUs based on the implementation in \citet{blelloch1990} and observed maximum speedups of 5 times over an optimized serial CPU implementation. The advantage of the GPU implementation increased with $n$ and then leveled off, acheiving its best performance on arrays with over 1 million elements. \citet{sengupta2008} implemented a variant of Parallel-Scan that is less efficient in that it requires a larger number of operations, but reduces the number of steps from $2\log_2(n)$ to $\log_2(n)$. They reported speedups of nearly $2\times$ compared to similar implementations based on Parallel-Scan. More recently, \citet{ha2013} offered an implementation based on an algorithm that is a hybrid of the two mentioned. They reported speedups of about $1.5\times$ when compared to the implementation of \citet{sengupta2008}.
+The actual speed-up attained depends on hardware and implementation. \citet{harris-scan} implemented Parallel-Scan for GPUs based on the implementation in \citet{blelloch1990} and observed maximum speedups of 5 times over an optimized serial CPU implementation. The advantage of the GPU implementation increased with $n$ and then leveled off, achieving its best performance on arrays with over 1 million elements. \citet{sengupta2008} implemented a variant of Parallel-Scan that is less efficient in that it requires a larger number of operations, but reduces the number of steps from $2\log_2(n)$ to $\log_2(n)$. They reported speedups of nearly $2\times$ compared to similar implementations based on Parallel-Scan. More recently, \citet{ha2013} offered an implementation based on an algorithm that is a hybrid of the two mentioned. They reported speedups of about $1.5\times$ when compared to the implementation of \citet{sengupta2008}.
 
 Parallel scans are used in various ways in our MCMC algorithm. For example, the calculation of cumulative probabilities to sample from categorical distributions in step 1 computes the cumulative sum -- on the log scale for numerical stability -- using $\log(e^{v_1}+e^{v_2})$ as the binary operator.
 % For a thorough treatment see \citet{blelloch1990}, and for implementation details in CUDA, see \citet{harris-scan}.
@@ -390,7 +391,7 @@ Owing to conjugacy, the full conditional distributions of our Gibbs sampler are 
 
 Insofar as the computation for these full conditionals depends on the data, it is only through summary statistics, which can be partially pre-computed (at the component level). Therefore, $y_g^\top W_g y_g$, $y_g^\top W_g X$, and $X^\top W_g X$ are computed once, prior to sampling, and saved in device memory. Also, in order to coalesce memory accesses for different steps, $\{y_g^\top W_g X\}_{1:G}$ is stored in two ways; row-wise and column-wise.
 
-Another strategy that we use in an effort to coalesce memory accesses is to adhere to the structure of arrays ("SoA") approach \citep{thrustslides}. In order to do so, it is necessary to organize the inputs and outputs for a kernel computing $f(A_i,B_i)=C_i$ so that $A, B$ and $C$ can be accessed like a ``zipped" set of ranges with a common index, i.e. $(A,B,C)_i = (A_i,B_i,C_i)$. Because of large number of operations required, we wanted to avoid sorting and/or copying to acheive the organization required for SoA. The solution was to use fancy iterators which enable arbitrary user-specified access patterns. If, for example, we wanted to calculate $f(A_i,B_j)=C_{ij}$ for $i=1,\ldots,I$, $j=1,\ldots,J$, we can recast the problem as $f(\tilde{A}_k,\tilde{B}_k)=\tilde{C}_k$ so that $\tilde{A}_k=A_{\mbox{floor}(k/J)+1}$, $\tilde{B}_k=B_{(k+1) \mod I +1}$ and $\tilde{C}$ is a 1-d array with $IJ$ elements where $\tilde{A},\tilde{B}$ are just virtual arrays which actually just provide a map to the memory stored in $A$ and $B$. 
+Another strategy that we use in an effort to coalesce memory accesses is to adhere to the structure of arrays ("SoA") approach \citep{thrustslides}. In order to do so, it is necessary to organize the inputs and outputs for a kernel computing $f(A_i,B_i)=C_i$ so that $A, B$ and $C$ can be accessed like a ``zipped" set of ranges with a common index, i.e. $(A,B,C)_i = (A_i,B_i,C_i)$. Because of large number of operations required, we wanted to avoid sorting and/or copying to achieve the organization required for SoA. The solution was to use fancy iterators which enable arbitrary user-specified access patterns. If, for example, we wanted to calculate $f(A_i,B_j)=C_{ij}$ for $i=1,\ldots,I$, $j=1,\ldots,J$, we can recast the problem as $f(\tilde{A}_k,\tilde{B}_k)=\tilde{C}_k$ so that $\tilde{A}_k=A_{\mbox{floor}(k/J)+1}$, $\tilde{B}_k=B_{(k+1) \mod I +1}$ and $\tilde{C}$ is a 1-d array with $IJ$ elements where $\tilde{A},\tilde{B}$ are just virtual arrays which actually just provide a map to the memory stored in $A$ and $B$. 
 
 \paragraph{Allocation parameters}
 The computational complexity for this step is $O(GKp^2)$. Fortunately, computation of the unnormalized weights is an embarassingly parallel problem. For numerical stability, these weights are computed on the log scale. From (\ref{zetafull}),
@@ -449,7 +450,7 @@ The scalar parameter $\alpha$ depends only on the constants $K$, $a_\alpha$ and 
   so that the posterior distributions for the weight at any given index
   is multi-modal. This is due to many configurations of the allocation
   parameters being nearly equivalent in the posterior. We suspect that, because of this weakness, poor initialization can
-  lead to very slow covergence.
+  lead to very slow convergence.
   % index becomes occupied, leading to a high draw for $\alpha$, which
   % increases subsequent draws for $\pi_k$, and so forth. In particular,
   % especially when $p$ is moderately large, during the initial stages the
@@ -458,15 +459,15 @@ The scalar parameter $\alpha$ depends only on the constants $K$, $a_\alpha$ and 
   % approximation. To avoid this problem, we reorder the cluster indices by their current value of $\pi_k$ after a short initial run, then proceed to subsequent burn-in iterations.
 }
 
-  We initialize our chains as follows. Using the ranges of independent estimates of the component-specific parameters, we set a regular $(p+1)$-dimensional grid. Using the base measure, we sort the grid values by their prior densities in descending order, retaining the first $K$. We set $\pi_k=1/K$ for all $k=1,\ldots,K$ and $\alpha$ to 1. Next we run the sampler for several thousand iterations. The initialization is taken to be the last iteration of the first chain, but with the indices reordered in descending order by $\pi$. The purpose for reordering is that, in the first chain, it is common for the last cluster to become occupied early and never become unoccupied. This is undesireable, as it undermines the quality of the truncation approximation. Reordering the indices after most of the clusters have become established seems to correct the problem (provided that $K$ is selected to be large enough.)
+  We initialize our chains as follows. Using the ranges of independent estimates of the component-specific parameters, we set a regular $(p+1)$-dimensional grid. Using the base measure, we sort the grid values by their prior densities in descending order, retaining the first $K$. We set $\pi_k=1/K$ for all $k=1,\ldots,K$ and $\alpha$ to 1. Next we run the sampler for several thousand iterations. The initialization is taken to be the last iteration of the first chain, but with the indices reordered in descending order by $\pi$. The purpose for reordering is that, in the first chain, it is common for the last cluster to become occupied early and never become unoccupied. This is undesirable, as it undermines the quality of the truncation approximation. Reordering the indices after most of the clusters have become established seems to correct the problem (provided that $K$ is selected to be large enough.)
 
 
-%Figure \ref{fig:max-id} shows traceplots of a series of Markov chains where reordering has been applied to each. The top frame shows the maximum occupied cluster ID and the bottom frame shows the value of $\alpha$. This example is simulated data with $G=40,000,\, p=6,\, \mbox{and } K=8000$.
+%Figure \ref{fig:max-id} shows trace plots of a series of Markov chains where reordering has been applied to each. The top frame shows the maximum occupied cluster ID and the bottom frame shows the value of $\alpha$. This example is simulated data with $G=40,000,\, p=6,\, \mbox{and } K=8000$.
 
 % \begin{figure}
 % \includegraphics[height=.4\textheight]{5-cycles-max-id}
 % \includegraphics[height=.4\textheight]{5-cycles-alpha}
-% \caption{Traceplots demonstrating high-level behavior after periodic reordering of cluster ids. Top: 5 series, maximum occupied cluster. Bottom: 5 series, $\alpha$.}
+% \caption{trace plots demonstrating high-level behavior after periodic reordering of cluster ids. Top: 5 series, maximum occupied cluster. Bottom: 5 series, $\alpha$.}
 % \label{fig:max-id}
 % \end{figure}
 
@@ -480,7 +481,7 @@ Because of the dimensionality of the problem is large, it is cumbersome to save 
   inequalities of the elements of $\beta_g$, i.e.,
   $\op{Pr}\left(c_1\beta_g > 0 \land \ldots \land c_t\beta_g > 0\right)$.
 \end{enumerate}
-Updates of these quantities are embarrasingly parallel across $g$, so are well suited to the GPU. The update in 1) is done elementwise, based on a running sum, and the update in 2) can be decomposed into four tasks, a matrix multiplication to compute $C\beta$, an elementwise evaluation of the sign of the value, a parallel setwise reduction using the minimum to evaluate each conjunction, and finally an update of the estimator (using the same functionality as 1)).
+Updates of these quantities are embarrassingly parallel across $g$, so are well suited to the GPU. The update in 1) is done elementwise, based on a running sum, and the update in 2) can be decomposed into four tasks, a matrix multiplication to compute $C\beta$, an elementwise evaluation of the sign of the value, a parallel set-wise reduction using the minimum to evaluate each conjunction, and finally an update of the estimator (using the same functionality as 1)).
 
 We also save and return several low-dimensional parameters which provide some information on the overall behavior of the sampler: the number of occupied clusters, the maximum id of the occupied clusters and $\alpha$, the concentration parameter. We also optionally return samples of selected component-specific parameters and a user-specified number of draws of $\mathcal{P}$.
 
@@ -524,7 +525,7 @@ The left panel of Figure \ref{timing} shows the average time per iteration at ea
 
 While the trends in time per iteration are fairly obvious, the results for time per effective sample are less so. This is expected, since the number of effective samples is an estimate, introducing another source of variability. The right panel of Figure \ref{timing} shows the average time per effective sample at simulation setting. While some trends reflect those seen in the raw time per iteration, there are some notable differences. The most important factor is still $K$, but $p$ has a much larger impact. Also, contrary to the previous figure, increases in $p$ are associated with a reduction in time required.
 
-A possible explanation for this relates to our simulation setup: the true number of clusters grows with $G$, but not with $p$. Also, the total number of samples does increase with $p$. By holding the number of clusters fixed and increasing the sample size with which to estimate their locations, while at the same time moving the clusters apart (by increasing the dimension of the parameter space), one expects that the partition of groups into clusters becomes more precise. Since we consider the effective sample size for $\alpha$ to be a proxy for the stability of the random partition separating groups into clusters, it follows then that increases in $p$ should increase the stability of both the random partition, as well as the parameter $\alpha$.
+A possible explanation for this relates to our simulation setup: the true number of clusters grows with $G$, but not with $p$. Also, the total number of samples does increase with $p$. By holding the number of clusters fixed, while moving the clusters apart (by increasing the dimension of the parameter space), one expects that the partition of groups into clusters becomes more precise. Since we consider the effective sample size for $\alpha$ to be a proxy for the stability of the random partition separating groups into clusters, it follows then that increases in $p$ should increase the stability of both the random partition, as well as the parameter $\alpha$.
 
 % \begin{figure}[!h]
 % \centering
@@ -534,12 +535,12 @@ A possible explanation for this relates to our simulation setup: the true number
 % \end{figure}
 
 \iftoggle{thesis}{
-Figure \ref{alpha-trace} shows normalized traceplots for $\alpha$. These show shorter and less extreme excursions at higher values of $p$, which is consistent with this hypothesis.
+Figure \ref{alpha-trace} shows normalized trace plots for $\alpha$. These show shorter and less extreme excursions at higher values of $p$, which is consistent with this hypothesis.
   
   \begin{figure}[ht]
   \centering
   \includegraphics[width=.9\textwidth]{alpha-efficiency}
-  \caption{Centered and scaled traceplots for $\alpha$ across levels of $p$ for various settings of $G$ and $K$.}
+  \caption{Centered and scaled trace plots for $\alpha$ across levels of $p$ for various settings of $G$ and $K$.}
   \label{alpha-trace}
   \end{figure}
 }
@@ -584,7 +585,7 @@ Figure \ref{alpha-trace} shows normalized traceplots for $\alpha$. These show sh
 % latex table generated in R 3.4.1 by xtable 1.8-2 package
 % Wed Sep 06 08:56:57 2017
 
-Table \ref{tab:regression} shows the result of fitting a linear regression of $\log_2(\mbox{seconds}/\mbox{effective sample}$ on $\log_2(K)$, $\log_2(G)$ and $\log_2(p)$. The estimated coefficients of this model suggest that seconds per effective sample grows sublinearly in $G$, approximately quadratic in $K$ and inversely with $V$.
+Table \ref{tab:regression} shows the result of fitting a linear regression of $\log_2(\mbox{seconds}/\mbox{effective sample}$ on $\log_2(K)$, $\log_2(G)$ and $\log_2(p)$. The estimated coefficients of this model suggest that seconds per effective sample grows sub linearly in $G$, approximately quadratic in $K$ and inversely with $V$.
 
 \begin{table}
 \caption[Estimated exponentiated coefficients for the linear regression model: (model)]{\small Estimated exponentiatedcoefficients for the linear regression model: \\\hspace{\textwidth}\(\log_2$(sec. per eff. sample)$=\beta_0 + \log_2(K)\beta_1 + \log_2(G)\beta_2 + \log_2(p)\beta_3 + \epsilon\). The exponentiated values are a multiplicative effect on the predicted median seconds per effective sample for each doubling in the corresponding predictor (K,G or p).}
@@ -606,14 +607,14 @@ p & $2^{\beta_3}$ & 0.5 & 0.4 & 0.6 \\
 
 \section{Example: Paschold maize data}
 \label{sec:analysis}
-\citet{paschold} produced an RNA-seq data set for gene expression of root tissue from 4 samples for each of two recombinant inbred maize genotypes, B73 and Mo17. Each sample was obtained from a combination of 10 primary roots from seedlings 3.5 days after germination. Illumina's Genome Analyzer II was used for sequencing. Two flow cells were utilized, with four replicates of each genotype split across flowcells. Among the researchers' aims was to identify genes which were differentially expressed in these parental lines.
+\citet{paschold} produced an RNA-seq data set for gene expression of root tissue from 4 samples for each of two recombinant inbred maize genotypes, B73 and Mo17. Each sample was obtained from a combination of 10 primary roots from seedlings 3.5 days after germination. Illumina's Genome Analyzer II was used for sequencing. Two flow cells were utilized, with four replicates of each genotype split across flow cells. Among the researchers' aims was to identify genes which were differentially expressed in these parental lines.
 
 \paragraph{Normalization and transformation}
 For RNA-seq data, column-wise normalization (often referred to as `between-sample' normalization) is required to adjust for systematic differences arising from the sequencing process. These systematic differences obfuscate, and are irrelevant to, the quantities of interest.
 
 For example, the total of all read counts (`library size') for a sample will vary, in part, due to differences in sequencing depth or total read count which lead to some columns having significantly higher total reads than others. A simple fix is to divide, for each sample and gene, by the library size of the sample. Unfortunately, this approach to normalization is problematic because the library size is often driven primarily by a few highly sequenced genes, making this approach too volatile. Fixes to this problem have been proposed; we used the trimmed mean of M-values (TMM) method of \citet{robinson2010} to obtain an `effective library size'. Other approaches have been proposed; for further discussion, see \citet{oshlack2010rna}.
 
-Because the data are non-negative and variability in expression tends to increase with the overall expression,  gene expression data is typically analyzed on a logarithmic scale, with difference in expression being multiplicative. Because of the presence of zeros, we add one to each count before taking logarithms and subtracting the log of the effective library size: $y_{gn} = \log(R_{gn}+1) - \log(L_{n})$, where $R_{gn}$ is the number of reads for sample $n$, gene $g$ and $L_{n}$ is the effective library size for the $n^{th}$ sample.
+Because the data are non-negative and variability in expression tends to increase with the overall expression,  gene expression data are typically analyzed on a logarithmic scale, with difference in expression being multiplicative. Because of the presence of zeros, we add one to each count before taking logarithms and subtracting the log of the effective library size: $y_{gn} = \log(R_{gn}+1) - \log(L_{n})$, where $R_{gn}$ is the number of reads for sample $n$, gene $g$ and $L_{n}$ is the effective library size for the $n^{th}$ sample.
 
 % For computational reasons, we assume a normal model for the data after transforming it. First, we compute normalization factor $c_i$ for each column; second, we take logarithms of the data, after adding 1, and apply the normalization on the log scale, .i.e.
 % $$\mbox{transformed log-count in column }i = \log (\mbox{original count in column }i+1) + \log(c_i)$$. 
@@ -676,10 +677,10 @@ To check for convergence, potential scale reduction factors (`R-hats') were esti
 }
 
 \subsection{Comparison of methods}
-In addition to our method, we also fit the data using two other methods/models: a gene independent model, fitted using least squares, and a hierarchical linear model, fitted by REML, which assumes constant variance and assumes a multivariate normal distribution for the random effects. These models were chosen to show illustrate the nonparametric shrinkage acheived by the BNP model, not because they are recommended or widely used methods for the analysis of these sorts of data.
+In addition to our method, we also fit the data using two other methods/models: a gene independent model, fitted using least squares, and a hierarchical linear model, fitted by REML, which assumes constant variance and assumes a multivariate normal distribution for the random effects. These models were chosen to show illustrate the nonparametric shrinkage achieved by the BNP model, not because they are recommended or widely used methods for the analysis of these sorts of data.
 
 \paragraph{Gene independent model}
-Estimate $\beta_g$ in Equation \ref{eq:data} by minimizing $\sum_{n=1}^N r_{gn}^2 = \sum_{n=1}^N\left(y_{gn}-x_n\beta_g\right)^2$. This method also provides an estimate of $\sigma_g^2$, $\hat{\sigma^2}_g = \sum_{n=1}^N r_{gn}^2/(p)$.
+Estimate $\beta_g$ in Equation \ref{eq:data} by minimizing $\sum_{n=1}^N r_{gn}^2 = \sum_{n=1}^N\left(y_{gn}-x_n\hat{\beta}_g\right)^2$. This method also provides an estimate of $\sigma_g^2$, $\hat{\sigma}^2_g = \sum_{n=1}^N r_{gn}^2/(N-p)$.
 
 \paragraph{Hierarchical/random effects model}
 In addition to Equation \ref{eq:data}, assume $\sigma^2_g = \sigma^2$ for all $g=1,\ldots,G$, and that $\mathcal{P} = \op{N}\left(\mu, \Sigma \right)$, for some $\mu \in \mathbb{R}^p$ and $\Sigma$ a positive definite matrix. This model was fit using the $lmer$ function in the $lme4$ package in $R$ \citep{lme4,r}.
@@ -700,7 +701,7 @@ In Figure \ref{pairs-3-methods}, we compare the bivariate histograms of the poin
 \caption{Histogram of point estimates across genes, showing pairwise comparisons, using hexagonal binning. Relative to the independent estimates obtained by least-squares, the estimates of the normal hierarchical model shrinks all estimates toward a common mean, while the Bayesian nonparametric model shrinks estimates toward an underlying distribution learned from the data.}
 \label{pairs-3-methods}
 \end{figure}
-By comparison, of the point estimates obtained by the BNP model (posterior means), some are shrunk while some are not and the degree of shrinkage in many cases is more dramatic. For example, in the three-way comparison of the bottom panels, the BNP shows aggressive shrinkage, relative to the hierarchical model, of the estimates of Mo17 toward zero for those genes with the most negative flow cell effects. Figure \ref{local-shrink} shows this phenomena in greater detail. The left-panels show a zoomed in version of the lower-left plot in Figure \ref{pairs-3-methods}, with a bounding box identifying a region of interest. The next plot to the right shows the gene independent estimates from that region, while the last two plots in the row show the corresponding estimates for the hierarchical and BNP models. The BNP estimates are much less predictable, but they show clear local shrinkage toward regions with high density in the left-most plot. %The seemingly erratic behavior is related to the two additional dimensions in which the shrinkage is being applied.
+By comparison, of the point estimates obtained by the BNP model (posterior means), some are shrunk while some are not and the degree of shrinkage in many cases is more dramatic. For example, in the three-way comparison of the bottom panels, the BNP shows aggressive shrinkage, relative to the hierarchical model, of the estimates of Mo17 toward zero for those genes with the most negative flow cell effects. Figure \ref{method-compare} shows this phenomena in greater detail. The left-panels show a zoomed in version of the lower-left plot in Figure \ref{pairs-3-methods}, with a bounding box identifying a region of interest. The next plot to the right shows the gene independent estimates from that region, while the last two plots in the row show the corresponding estimates for the hierarchical and BNP models. The BNP estimates are much less predictable, but they show clear local shrinkage toward regions with high density in the left-most plot. %The seemingly erratic behavior is related to the two additional dimensions in which the shrinkage is being applied.
 \begin{figure}
 \centering
 \includegraphics[width=.9\textwidth]{local_shrink}
@@ -765,7 +766,7 @@ Figure \ref{diff-hist} helps to visualize the differences between the shrinkage 
 % \includegraphics[width=\textwidth]{ggpairs_s}
 % \caption{Histograms and pairwise histograms of posterior means of
 %   nonparametric model. Relative to the estimates in Figure
-%   \ref{ggpairs_us}, there is substantial shrinkage acheived by latent
+%   \ref{ggpairs_us}, there is substantial shrinkage achieved by latent
 %   clustering.}
 % \label{ggpairs_s}
 % \end{figure}
@@ -774,51 +775,7 @@ Figure \ref{diff-hist} helps to visualize the differences between the shrinkage 
 \label{sec:discussion}
 Although quite computationally intensive, nonparametric Bayesian methods are becoming computationally feasible in applications, even for fairly sizable datasets, such as gene expression profiling. One way to achieve computational feasibility is through adapting existing procedures to take advantage of massively parallel systems like the GPU.
 
-The large number of zero counts usually present in RNA-seq data, preclude taking logarithms of the raw data. We have circumvented the problem by adding one to the counts prior to normalization. There is theoretical support for the use of a Poisson model for RNA-seq counts absent any biological variation, a fact which is often used to motivate the use of negative binomial distribution for RNA-seq data, the negative binomial being a gamma mixture of Poissons. We opted to use a normal model for the log-frequency rather to model the counts directly. It would be possible to modify our method to use a negative binomial model for the counts and replace the  
+The large number of zero counts usually present in RNA-seq data, preclude taking logarithms of the raw data. We have circumvented the problem by adding one to the counts prior to normalization. There is theoretical support for the use of a Poisson model for RNA-seq counts absent any biological variation, a fact which is often used to motivate the use of negative binomial distribution for RNA-seq data, the negative binomial being a gamma mixture of Poissons. We opted to use a normal model for the log-frequency rather to model the counts directly. It would be possible to modify our method to use a negative binomial model for the counts, although there would be additional computational cost because the sufficient statistics are less convenient to work with.
 
 We have found that our proposed procedure scales well and is computationally feasible with data sets containing tens of thousands of components like that which is common currently with gene expression data. In addition, design matrices up to 6 do not present a computational problem for the procedure. For larger sample sizes, we would expect that a larger number of clusters would be required to explain the data. Increasing $K$ is a computational burden; we found the time per effective iteration to be quadratic in $K$. Also, the potential benefits of borrowing information diminish with sample size, reducing the potential benefit of a hierarchical model.
-
-\appendix
-\section{CUDA libraries}
-There are several libraries that make implementing these algorithms easier in CUDA. Thrust \citep{thrust} extends many concepts from the C++ Standard Template Library to Nvidia GPUs. Included are several useful generic algorithms:
-\begin{itemize}
-\item \code{thrust::for\_each}: This algorithm accepts a functor (an
-  instance of a class with a member \code{operator()} function)
-  and an iterator. The serial version increments the iterator, passing
-  each element to the \code{operator()} in turn. The parallel implementation
-  produces the same results, only in thread parallel fashion. The
-  \code{thrust::zip\_iterator} is very useful, as it can be used
-  to iterate
-  over a \code{thrust::tuple}. This approach is very general, allowing
-  for operations involving up to ten variables using an SoA
-  design.
-
-\item \code{thrust::reduce/reduce\_by\_key}: As described in section
-  \ref{sec:parallel}, both reduce and cumulative sum are defined for any associative binary operators. Reduce by key accepts a key argument and a compatible binary predicate that identifies changes in the key. For example, for the binary predicate \code{x == y}, the key \code{\{1,1,1,2,2,1\}} would have the result be three quantities, the reductions of the first three values, the next two and the last, respectively.
-
-\item \code{thrust::inclusive/exclusive\_scan/scan\_by\_key}: Thrust
-  offers multiple versions of scan, which is another term for cumulative sum. The exclusive
-  version results in the array element, $a_i$, containing the sum $s_{i-1}$ (excluding the value $v_i$, while the inclusive version leaves $a_i$ containing $s_i$.
-\end{itemize}
-
-For linear algebra on the GPU, standard installations of CUDA also
-include CUBLAS \cite{cublas}. CUBLAS has implementions of BLAS/LAPACK
-routines optimized for the GPU. Typically, calls to the CUBLAS
-functions are initiated by the CPU and act on device memory (host
-API). For newer GPUs (compute 3.5 and later), there are routines that
-can be initiated within a kernel (device API). From the host API, our
-algorithm uses \code{cublasDgemm} for multiplying large matrices in
-device memory. From the
-device API, our algorithm uses \code{cublasDtrsv} to solve many small triangular
-systems of equations in parallel.
-
-Schemes for parallel pseudo-random number generation (PRNG) have been
-developed for CUDA. Since PRNGs are deterministic and sequential, a
-natural parallel adaptation is access the same sequence at locations
-distant enough to avoid overlap or to use a strided access
-pattern. CURAND \cite{curand}, provides such functionality for generating
-normal and uniform random numbers on the GPU. For other distributions,
-such as gamma,
-one can write a custom kernel, making use of CURAND as a source of
-randomness, for threaded sampler.
 
