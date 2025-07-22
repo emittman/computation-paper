@@ -1,5 +1,5 @@
 # Computational strategy for fitting Dirichlet Process Mixture Model for Gene Expression Experiments
-- Second chapter of my dissertation [[https://dr.lib.iastate.edu/server/api/core/bitstreams/42b94ef8-a562-4776-80b9-f0f59e000452/content]]
+- Second chapter of my dissertation https://dr.lib.iastate.edu/server/api/core/bitstreams/42b94ef8-a562-4776-80b9-f0f59e000452/content
 - The study explores a flexible Bayesian nonparametric hierarchical model for gene expression data.
 - High-throughput RNA sequencing enables simultaneous measurement of relative expression for tens of thousands of genes (Wang et al., 2009).
 - Researchers aim to identify genes involved in various biological phenomena using gene expression data.
